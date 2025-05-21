@@ -5,13 +5,14 @@ const {
   responsestatusdata,
 } = require("../middleware/responses"); // update path accordingly
 const crypto = require("crypto");
+const roundsModel = require("../model/rounds.model");
 
 exports.addCard = async (req, res) => {
   // Call the upload middleware for 'card' field
   upload.single("card")(req, res, async () => {
     try {
       const { name } = req.body;
-      console.log(name , req.file)
+      console.log(name, req.file);
       if (!name || !req.file) {
         return responsestatusmessage(
           res,
@@ -39,21 +40,51 @@ exports.addCard = async (req, res) => {
       console.error(error);
       return responsestatusmessage(res, "fail", "Something went wrong.");
     }
-  },
-)}
+  });
+};
 
 exports.getCards = async (req, res) => {
   try {
     const cards = await Card.find();
+    const currentRoundId = getCurrentRoundId(); // "2025-05-17T14:00:00.000Z"
+    console.log(currentRoundId);
+    const currentRound = await roundsModel.findOne({
+      combo: new Date(currentRoundId),
+    });
 
     if (!cards || cards.length === 0) {
-      return responsestatusmessage(res, "error", "No cards found.");
+      fail;
+      return responsestatusmessage(res, "fail", "No cards found.");
     }
 
-    return responsestatusdata(res, "success", "Cards retrieved successfully", cards);
+    return responsestatusdata(res, "success", "Cards retrieved successfully", {
+      cards,
+      currentRound,
+    });
   } catch (error) {
     console.error(error);
-    return responsestatusmessage(res, "error", "Something went wrong.");
+    return responsestatusmessage(res, "fail", "Something went wrong.");
+  }
+};
+
+exports.getAdminCards = async (req, res) => {
+  try {
+    const cards = await Card.find();
+
+    if (!cards || cards.length === 0) {
+      fail;
+      return responsestatusmessage(res, "fail", "No cards found.");
+    }
+
+    return responsestatusdata(
+      res,
+      "success",
+      "Cards retrieved successfully",
+      cards
+    );
+  } catch (error) {
+    console.error(error);
+    return responsestatusmessage(res, "fail", "Something went wrong.");
   }
 };
 
@@ -62,4 +93,13 @@ function generateImageName(originalName) {
   const randomStr = crypto.randomBytes(3).toString("hex"); // 6 characters
   const extension = originalName.substring(originalName.lastIndexOf(".")); // keep .jpg, .png, etc.
   return `img${dateStr}${randomStr}${extension}`;
+}
+
+function getCurrentRoundId(now = new Date()) {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hour = String(now.getHours()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }

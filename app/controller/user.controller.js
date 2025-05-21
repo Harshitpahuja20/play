@@ -226,3 +226,21 @@ exports.adminlogin = async (req, res) => {
     return responsestatusmessage(res, "error", "Something went wrong.");
   }
 };
+
+exports.getCurrentRole = async (req, res) => {
+  try {
+    const user = req.user;
+    return responsestatusdata(res, true, "Fetched Successfully", user);
+  } catch (error) {
+    return responsestatusmessage(res, false, err?.message);
+  }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({isVerified : true , role : {$ne : "admin"}});
+    return responsestatusdata(res, true, "Fetched Successfully", users);
+  } catch (error) {
+    return responsestatusmessage(res, false, err?.message);
+  }
+};

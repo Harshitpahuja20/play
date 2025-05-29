@@ -26,6 +26,15 @@ const betSchema = new Schema(
       type: mongoose.Types.ObjectId,
       ref: "Round",
     },
+
+    status: {
+      type: "string",
+      deafult: "pending",
+    },
+
+    resultAmount : {
+      type : Number
+    }
   },
   { timestamps: true }
 );

@@ -16,7 +16,7 @@ exports.addCard = async (req, res) => {
       if (!name || !req.file) {
         return responsestatusmessage(
           res,
-          "fail",
+          false,
           "Name and image are required."
         );
       }
@@ -32,40 +32,56 @@ exports.addCard = async (req, res) => {
 
       return responsestatusdata(
         res,
-        "success",
+        true,
         "Card added successfully",
         newCard
       );
     } catch (error) {
       console.error(error);
-      return responsestatusmessage(res, "fail", "Something went wrong.");
+      return responsestatusmessage(res, false, "Something went wrong.");
     }
   });
 };
 
 exports.getCards = async (req, res) => {
   try {
-    const cards = await Card.find();
-    const currentRoundId = getCurrentRoundId(); // "2025-05-17T14:00:00.000Z"
-    console.log(currentRoundId);
-    const currentRound = await roundsModel.findOne({
-      combo: new Date(currentRoundId),
-    });
+    // Run independent queries concurrently for better speed
+    const currentRoundId = new Date(getCurrentRoundId());
+    const previousRoundId = new Date(getPreviousRoundId());
+
+    const [cards, currentRound, previousRound] = await Promise.all([
+      Card.find(),
+      roundsModel.findOne({ combo: currentRoundId }),
+      roundsModel.findOne({ combo: previousRoundId }).populate({
+        path: "cardId",
+        select: "image name", // only fetch needed fields
+      }),
+    ]);
 
     if (!cards || cards.length === 0) {
-      fail;
-      return responsestatusmessage(res, "fail", "No cards found.");
+      return responsestatusmessage(res, false, "No cards found.");
     }
 
-    return responsestatusdata(res, "success", "Cards retrieved successfully", {
+    // Format previousRound data for consistent shape (optional)
+    const formattedPreviousRound = previousRound
+      ? {
+          _id: previousRound._id,
+          image: previousRound.cardId?.image || null,
+          name: previousRound.cardId?.name || null,
+        }
+      : null;
+
+    return responsestatusdata(res, true, "Cards retrieved successfully", {
       cards,
       currentRound,
+      previousRound: formattedPreviousRound,
     });
   } catch (error) {
     console.error(error);
-    return responsestatusmessage(res, "fail", "Something went wrong.");
+    return responsestatusmessage(res, false, "Something went wrong.");
   }
 };
+
 
 exports.getAdminCards = async (req, res) => {
   try {
@@ -73,18 +89,18 @@ exports.getAdminCards = async (req, res) => {
 
     if (!cards || cards.length === 0) {
       fail;
-      return responsestatusmessage(res, "fail", "No cards found.");
+      return responsestatusmessage(res, false, "No cards found.");
     }
 
     return responsestatusdata(
       res,
-      "success",
+      true,
       "Cards retrieved successfully",
       cards
     );
   } catch (error) {
     console.error(error);
-    return responsestatusmessage(res, "fail", "Something went wrong.");
+    return responsestatusmessage(res, false, "Something went wrong.");
   }
 };
 
@@ -100,6 +116,21 @@ function getCurrentRoundId(now = new Date()) {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   const hour = String(now.getHours()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+}
+
+function getPreviousRoundId(now = new Date()) {
+  // Clone the date so we don't mutate the original
+  const prevHourDate = new Date(now);
+
+  // Subtract one hour
+  prevHourDate.setHours(prevHourDate.getHours() - 1);
+
+  const year = prevHourDate.getFullYear();
+  const month = String(prevHourDate.getMonth() + 1).padStart(2, "0");
+  const day = String(prevHourDate.getDate()).padStart(2, "0");
+  const hour = String(prevHourDate.getHours()).padStart(2, "0");
 
   return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }

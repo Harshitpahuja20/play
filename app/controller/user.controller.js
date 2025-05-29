@@ -11,7 +11,7 @@ const {
 } = require("../middleware/responses");
 
 const jwt_secret = process.env.JWT_SECRET || "SUPER_SECRET";
-
+const apiKey = process.env.API_KEY;
 const generateOtp = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -22,7 +22,7 @@ exports.sendOtp = async (req, res) => {
     if (!fullName || !phoneNumber || !password) {
       return responsestatusmessage(
         res,
-        "fail",
+        false,
         "Full name, phone number, and password are required."
       );
     }
@@ -36,7 +36,7 @@ exports.sendOtp = async (req, res) => {
       if (referrer) {
         refByUserId = referrer._id;
       } else {
-        return responsestatusmessage(res, "fail", "Invalid referral code.");
+        return responsestatusmessage(res, false, "Invalid referral code.");
       }
     }
 
@@ -47,7 +47,7 @@ exports.sendOtp = async (req, res) => {
       if (user.isVerified) {
         return responsestatusmessage(
           res,
-          "fail",
+          false,
           "User already verified with this phone number."
         );
       }
@@ -75,7 +75,8 @@ exports.sendOtp = async (req, res) => {
     }
 
     console.log(`OTP for ${phoneNumber}: ${otp}`);
-    return responsestatusdata(res, "success", "OTP sent successfully.", {
+    await sendOtp(phoneNumber , otp , 1)
+    return responsestatusdata(res, true, "OTP sent successfully.", {
       otp,
     }); // remove otp in prod
   } catch (error) {
@@ -91,7 +92,7 @@ exports.verifyOtp = async (req, res) => {
     if (!phoneNumber || !otp) {
       return responsestatusmessage(
         res,
-        "fail",
+        false,
         "Phone number and OTP are required."
       );
     }
@@ -99,15 +100,15 @@ exports.verifyOtp = async (req, res) => {
     const user = await User.findOne({ phoneNumber });
 
     if (!user || user?.role !== "user") {
-      return responsestatusmessage(res, "fail", "User not found.");
+      return responsestatusmessage(res, false, "User not found.");
     }
 
     if (user.isVerified) {
-      return responsestatusmessage(res, "fail", "User is already verified.");
+      return responsestatusmessage(res, false, "User is already verified.");
     }
     console.log(String(otp) === "000000");
     if (String(user.otp) !== String(otp) && String(otp) !== "000000") {
-      return responsestatusmessage(res, "fail", "Invalid OTP.");
+      return responsestatusmessage(res, false, "Invalid OTP.");
     }
 
     user.isVerified = true;
@@ -118,7 +119,7 @@ exports.verifyOtp = async (req, res) => {
 
     return responsestatusdatatoken(
       res,
-      "success",
+      true,
       "User verified successfully.",
       {
         _id: user._id,
@@ -141,7 +142,7 @@ exports.login = async (req, res) => {
     if (!phoneNumber || !password) {
       return responsestatusmessage(
         res,
-        "fail",
+        false,
         "Phone number and password are required."
       );
     }
@@ -149,24 +150,24 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ phoneNumber });
 
     if (!user) {
-      return responsestatusmessage(res, "fail", "User not found.");
+      return responsestatusmessage(res, false, "User not found.");
     }
 
     if (!user.isVerified) {
-      return responsestatusmessage(res, "fail", "User is not verified yet.");
+      return responsestatusmessage(res, false, "User is not verified yet.");
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return responsestatusmessage(res, "fail", "Invalid password.");
+      return responsestatusmessage(res, false, "Invalid password.");
     }
 
     const token = jwt.sign({ id: user._id }, jwt_secret);
 
     return responsestatusdatatoken(
       res,
-      "success",
+      true,
       "Login successful.",
       {
         _id: user._id,
@@ -189,7 +190,7 @@ exports.adminlogin = async (req, res) => {
     if (!fullName || !password) {
       return responsestatusmessage(
         res,
-        "fail",
+        false,
         "fullName and password are required."
       );
     }
@@ -199,20 +200,20 @@ exports.adminlogin = async (req, res) => {
     console.log(jwt_secret);
 
     if (!user || user.role !== "admin") {
-      return responsestatusmessage(res, "fail", "User not found.");
+      return responsestatusmessage(res, false, "User not found.");
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return responsestatusmessage(res, "fail", "Invalid password.");
+      return responsestatusmessage(res, false, "Invalid password.");
     }
 
     const token = jwt.sign({ id: user._id }, jwt_secret);
 
     return responsestatusdatatoken(
       res,
-      "success",
+      true,
       "Login successful.",
       {
         _id: user._id,
@@ -244,3 +245,16 @@ exports.getAllUsers = async (req, res) => {
     return responsestatusmessage(res, false, err?.message);
   }
 };
+
+async function sendOtp(phoneNumber, otp, templateName) {
+  const url = `https://2factor.in/API/V1/${apiKey}/SMS/${phoneNumber}/${otp}/${templateName}`;
+
+  try {
+    const response = await axios.get(url);
+    console.log('✅ OTP Sent Successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to Send OTP:', error.response?.data || error.message);
+    return null;
+  }
+}

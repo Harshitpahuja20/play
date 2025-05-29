@@ -15,9 +15,8 @@ const transactionSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
-    depositedBy: {
+    handledBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // or "Admin" if you use a separate model
       required: true,
@@ -29,7 +28,7 @@ const transactionSchema = new mongoose.Schema(
     },
     method: {
       type: String,
-      enum: ["cash", "bank", "upi", "wallet" , "bonus"],
+      enum: ["cash", "bank", "upi", "wallet", "bonus"],
       default: "cash",
     },
     remarks: {
@@ -39,6 +38,9 @@ const transactionSchema = new mongoose.Schema(
     referenceId: {
       type: String,
       default: "",
+    },
+    upiId: {
+      type: String,
     },
   },
   { timestamps: true }

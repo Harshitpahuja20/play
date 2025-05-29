@@ -22,7 +22,7 @@ const {
   getAllRounds,
   updateResult,
 } = require("../controller/round.controller");
-const { addBalance } = require("../controller/transaction.controller");
+const { addBalance, getUserTransactions, getWithdrawRequests } = require("../controller/transaction.controller");
 const { getStatistics } = require("../controller/dashbaord.controller");
 
 const router = express.Router();
@@ -32,13 +32,13 @@ router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/login", login);
 router.post("/adminlogin", adminlogin);
-router.get("/getCurrentRole", getCurrentRole);
-router.get("/getAllUsers", getAllUsers);
+router.get("/getCurrentRole",authAdmin, getCurrentRole);
+router.get("/getAllUsers", authAdmin , getAllUsers);
 
 // card routes
 router.post("/addCard", authAdmin, addCard);
 router.get("/getCards", getCards);
-router.get("/getAdminCards", getAdminCards);
+router.get("/getAdminCards",authAdmin, getAdminCards);
 
 // bet routes
 router.post("/bet",authUser, placeBet); // place a bet
@@ -46,13 +46,16 @@ router.get("/bets", authUser, getUserBets); // user history
 router.get("/bets", getAllBets);
 
 // round routes
-router.get("/getAllRounds", getAllRounds);
-router.put("/updateResult", updateResult);
+router.get("/getAllRounds",authAdmin, getAllRounds);
+router.put("/updateResult",authAdmin, updateResult);
 
-// round routes
-router.get("/addBalance", addBalance);
+// balance routes
+router.post("/addBalance",authAdmin, addBalance);
+router.get("/getWithdrawRequests",authAdmin, getWithdrawRequests);
+router.get("/getUserTransactions",authUser, getUserTransactions);
+router.post("/requestWithdraw",authUser, WithdrawRequest);
 
 // statistics routes
-router.get("/getStatistics", getStatistics);
+router.get("/getStatistics",authAdmin, getStatistics);
 
 module.exports = router;

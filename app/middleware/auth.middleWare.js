@@ -7,37 +7,38 @@ const jwt_secret = process.env.JWT_SECRET || 'SUPER_SECRET';
 exports.authUser = async (req, res, next) => {
   try {
     const token = req.header("authorization");
-    if (!token) return responsestatusmessage(res, "fail", "Token not found");
+    if (!token) return responsestatusmessage(res, false, "Token not found");
 
     const decoded = jwt.verify(token, jwt_secret);
     const user = await userModel.findById(decoded.id).select("-otp -__v");
 
     if (!user || user.role !== "user") {
-      return responsestatusmessage(res, "fail", "Unauthorized User");
+      return responsestatusmessage(res, false, "Unauthorized User");
     }
 
     req.user = user;
     next();
   } catch (err) {
-    return responsestatusmessage(res, "fail", "Invalid token");
+    return responsestatusmessage(res, false, "Invalid token");
   }
 };
 
 exports.authAdmin = async (req, res, next) => {
   try {
     const token = req.header("authorization");
-    if (!token) return responsestatusmessage(res, "fail", "Token not found");
+    console.log(token)
+    if (!token) return responsestatusmessage(res, false, "Token not found");
 
     const decoded = jwt.verify(token, jwt_secret);
     const user = await userModel.findById(decoded.id).select("-otp -__v");
 
     if (!user || user.role !== "admin") {
-      return responsestatusmessage(res, "fail", "Unauthorized Admin");
+      return responsestatusmessage(res, false, "Unauthorized Admin");
     }
 
     req.user = user;
     next();
   } catch (err) {
-    return responsestatusmessage(res, "fail", "Invalid token");
+    return responsestatusmessage(res, false, "Invalid token");
   }
 };

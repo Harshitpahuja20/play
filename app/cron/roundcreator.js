@@ -2,104 +2,177 @@ const cron = require("node-cron");
 const roundsModel = require("../model/rounds.model");
 const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
+const cardModel = require("../model/card.model");
 
-cron.schedule("* * * * *", async () => {
+// runs every hour
+cron.schedule("0 * * * *", async () => {
   try {
-    console.log("Cron1 run");
-
-    const now   = new Date();
-    const year  = now.getFullYear();
+    const now = new Date();
+    const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day   = String(now.getDate()).padStart(2, "0");
-    const hour  = String(now.getHours()).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hour = String(now.getHours()).padStart(2, "0");
 
     const comboDate = new Date(`${year}-${month}-${day}T${hour}:00:00.000Z`);
-    const dateOnly  = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+    const dateOnly = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
 
-    // Check if this round already exists
-    const exists = await roundsModel.findOne({ combo: comboDate });
-    if (exists) {
-      console.log(`[Round Cron] Round ${comboDate.toISOString()} already exists`);
+    // Find current open round
+    const round = await roundsModel.findOne({
+      date: dateOnly,
+      time: comboDate,
+      isClosed: false,
+    });
+
+    if (!round) {
+      console.log("[CRON] No open round found for processing");
       return;
     }
 
-    // Find latest roundId and increment
-    const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
-    const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
+    // Assign cardId if missing
+    if (!round.cardId) {
+      let cardBets = await betModel.aggregate([
+        { $match: { roundId: round._id } },
+        {
+          $group: {
+            _id: "$cardId",
+            totalBets: { $sum: "$betAmount" },
+          },
+        },
+        { $sort: { totalBets: 1 } },
+        { $limit: 1 },
+      ]);
 
-    // Create new round
-    await roundsModel.create({
-      date:    dateOnly,
-      time:    comboDate,
-      combo:   comboDate,
-      roundId: nextRoundId,
-    });
+      if (cardBets.length === 0) {
+        const [randomCard] = await cardModel.aggregate([
+          { $sample: { size: 1 } },
+        ]);
+        round.cardId = randomCard?._id;
+      } else {
+        round.cardId = cardBets[0]._id;
+      }
 
-    console.log(`[Round Cron] Created round ${comboDate.toISOString()} with roundId ${nextRoundId}`);
-  } catch (err) {
-    console.error("[Round Cron] Error:", err.message);
+      await round.save();
+
+      console.log(
+        `[CRON] Set cardId ${round.cardId} for round ${comboDate.toISOString()}`
+      );
+    }
+
+    const winningCardId = round.cardId.toString();
+
+    // Fetch all bets for this round
+    const bets = await betModel.find({ roundId: round._id });
+
+    const bulkUserOps = [];
+    const bulkBetOps = [];
+
+    // Process bets concurrently
+    await Promise.all(
+      bets.map(async (bet) => {
+        const isWin = bet.cardId.toString() === winningCardId;
+        const resultAmount = isWin ? bet.betAmount * 11 : bet.betAmount;
+        const userCredit = isWin ? resultAmount : 0;
+
+        bulkBetOps.push({
+          updateOne: {
+            filter: { _id: bet._id },
+            update: { $set: { status: isWin ? "win" : "loss", resultAmount } },
+          },
+        });
+
+        if (userCredit > 0) {
+          bulkUserOps.push({
+            updateOne: {
+              filter: { _id: bet.userId },
+              update: { $inc: { balance: userCredit } },
+            },
+          });
+        }
+      })
+    );
+
+    if (bulkUserOps.length > 0) await User.bulkWrite(bulkUserOps);
+    if (bulkBetOps.length > 0) await betModel.bulkWrite(bulkBetOps);
+
+    // Close the round
+    round.isClosed = true;
+    await round.save();
+
+    console.log(
+      `[CRON] Round ${comboDate.toISOString()} processed and closed.`
+    );
+  } catch (error) {
+    console.error("[CRON] evaluate-last-hour error:", error);
   }
 });
 
-cron.schedule("* * * * *", async () => {
+// runs every 55 minutes to close round and create next round
+cron.schedule("55 * * * *", async () => {
   try {
-    const now   = new Date();
-    const year  = now.getFullYear();
+    console.log(`Every 55 minutes cron job start`);
+
+    const now = new Date();
+    const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day   = String(now.getDate()).padStart(2, "0");
-    const hour  = String(now.getHours()).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hour = now.getHours();
 
-    const comboDate = new Date(`${year}-${month}-${day}T${hour}:00:00.000Z`);
-    const dateOnly  = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+    const currentHourStr = String(hour).padStart(2, "0");
+    const nextHour = (hour + 1) % 24;
+    const nextHourStr = String(nextHour).padStart(2, "0");
 
-    const round = await roundsModel.findOne({
-      date: dateOnly,
-      time : comboDate,
-      isClosed: false
+    // Current round combo datetime
+    const currentCombo = new Date(
+      `${year}-${month}-${day}T${currentHourStr}:00:00.000Z`
+    );
+    // Next round combo datetime
+    const nextCombo = new Date(
+      `${year}-${month}-${day}T${nextHourStr}:00:00.000Z`
+    );
+
+    // Date only for day grouping
+    const dateOnly = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+
+    // 1. Close current round if open
+    const currentRound = await roundsModel.findOne({
+      combo: currentCombo,
+      isClosed: false,
     });
-
-    console.log(`round ${JSON.stringify(round)}`)
-
-    if (!round) return;
-
-    const winningCardId = round.cardId;
-    const bets = await betModel.find({ roundId: round._id });
-
-    const bulkUsers = [];
-    const bulkBets  = [];
-    const history   = [];
-
-    for (const bet of bets) {
-      const win = bet.cardId.toString() === winningCardId.toString();
-      const credit = win ? bet.amount * 10 : -bet.amount;
-
-      bulkBets.push({
-        updateOne: { filter: { _id: bet._id }, update: { $set: { status: win ? "win" : "loss" } } }
-      });
-
-      bulkUsers.push({
-        updateOne: { filter: { _id: bet.userId }, update: { $inc: { demoCoins: credit } } }
-      });
-
-      history.push({
-        userId: bet.userId,
-        roundId: round._id,
-        betId: bet._id,
-        result: win ? "win" : "loss",
-        amount: credit,
-        createdAt: new Date()
-      });
+    if (currentRound) {
+      currentRound.isClosed = true;
+      await currentRound.save();
+      console.log(`[Round Cron] Closed round: ${currentCombo.toISOString()}`);
+    } else {
+      console.log(
+        `[Round Cron] No open round found for closing at: ${currentCombo.toISOString()}`
+      );
     }
 
-    await Promise.all([
-      User.bulkWrite(bulkUsers),
-      betModel.bulkWrite(bulkBets),
-      // History.insertMany(history)
-    ]);
+    // 2. Check if next round exists
+    const existsNext = await roundsModel.findOne({ combo: nextCombo });
+    if (existsNext) {
+      console.log(
+        `[Round Cron] Next round ${nextCombo.toISOString()} already exists`
+      );
+      return;
+    }
 
-    round.isClosed = true;
-    await round.save();
-  } catch (err) {
-    console.error("[CRON] evaluate-last-hour error:", err);
+    // 3. Get last roundId and increment
+    const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
+    const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
+
+    // 4. Create the next round
+    await roundsModel.create({
+      date: dateOnly,
+      time: nextCombo,
+      combo: nextCombo,
+      roundId: nextRoundId,
+      isClosed: false,
+    });
+    console.log(
+      `[Round Cron] Created next round: ${nextCombo.toISOString()}, roundId: ${nextRoundId}`
+    );
+  } catch (error) {
+    console.error("[Round Cron] Error:", error);
   }
-})
+});

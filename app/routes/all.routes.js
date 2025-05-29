@@ -53,7 +53,7 @@ router.put("/updateResult",authAdmin, updateResult);
 router.post("/addBalance",authAdmin, addBalance);
 router.get("/getWithdrawRequests",authAdmin, getWithdrawRequests);
 router.get("/getUserTransactions",authUser, getUserTransactions);
-router.post("/requestWithdraw",authUser, WithdrawRequest);
+// router.post("/requestWithdraw",authUser, WithdrawRequest);
 
 // statistics routes
 router.get("/getStatistics",authAdmin, getStatistics);

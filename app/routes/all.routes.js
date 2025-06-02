@@ -22,8 +22,9 @@ const {
   getAllRounds,
   updateResult,
 } = require("../controller/round.controller");
-const { addBalance, getUserTransactions, getWithdrawRequests } = require("../controller/transaction.controller");
+const { addBalance, getUserTransactions, getWithdrawRequests, WithdrawRequest } = require("../controller/transaction.controller");
 const { getStatistics } = require("../controller/dashbaord.controller");
+const { getContent } = require("../controller/Content.controller");
 
 const router = express.Router();
 
@@ -53,9 +54,12 @@ router.put("/updateResult",authAdmin, updateResult);
 router.post("/addBalance",authAdmin, addBalance);
 router.get("/getWithdrawRequests",authAdmin, getWithdrawRequests);
 router.get("/getUserTransactions",authUser, getUserTransactions);
-// router.post("/requestWithdraw",authUser, WithdrawRequest);
+router.post("/requestWithdraw",authUser, WithdrawRequest);
 
 // statistics routes
 router.get("/getStatistics",authAdmin, getStatistics);
+
+// content routes
+router.post("/getContent",authUser, getContent);
 
 module.exports = router;

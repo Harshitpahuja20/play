@@ -5,7 +5,9 @@ const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
 // runs every hour
-cron.schedule("0 * * * *", async () => {
+cron.schedule("59 * * * *", async () => {
+  console.log("cron 1 start");
+  
   try {
     const now = new Date();
     const year = now.getFullYear();

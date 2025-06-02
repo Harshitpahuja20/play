@@ -13,6 +13,7 @@ app.use(cors());
 
 app.use("/api", userRoutes);
 app.use("/", express.static(path.join(__dirname, "public", "uploads")));
+app.use("/", express.static(path.join(__dirname,"public","views")));
 
 mongoose
   .connect(process.env.MONGO_DB || "mongodb://localhost:27017/taash")

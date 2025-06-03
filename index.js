@@ -3,8 +3,8 @@ const path = require("path");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const userRoutes = require("./app/routes/all.routes");
-require("dotenv").config()
-require("./app/cron/roundcreator")
+require("dotenv").config();
+require("./app/cron/roundcreator");
 
 const app = express();
 
@@ -13,7 +13,7 @@ app.use(cors());
 
 app.use("/api", userRoutes);
 app.use("/", express.static(path.join(__dirname, "public", "uploads")));
-app.use("/", express.static(path.join(__dirname,"public","views")));
+app.use("/", express.static(path.join(__dirname, "public", "views")));
 
 mongoose
   .connect(process.env.MONGO_DB || "mongodb://localhost:27017/taash")

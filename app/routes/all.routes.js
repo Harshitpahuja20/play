@@ -60,6 +60,6 @@ router.post("/requestWithdraw",authUser, WithdrawRequest);
 router.get("/getStatistics",authAdmin, getStatistics);
 
 // content routes
-router.post("/getContent",authUser, getContent);
+router.get("/getContent", getContent);
 
 module.exports = router;

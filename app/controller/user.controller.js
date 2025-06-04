@@ -238,6 +238,15 @@ exports.getCurrentRole = async (req, res) => {
   }
 };
 
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const user = req.user;
+    return responsestatusdata(res, true, "Fetched Successfully", user);
+  } catch (error) {
+    return responsestatusmessage(res, false, err?.message);
+  }
+};
+
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find({isVerified : true , role : {$ne : "admin"}});

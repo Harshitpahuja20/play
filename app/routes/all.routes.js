@@ -6,6 +6,7 @@ const {
   adminlogin,
   getCurrentRole,
   getAllUsers,
+  getCurrentUser,
 } = require("../controller/user.controller");
 const {
   addCard,
@@ -34,6 +35,7 @@ router.post("/verify-otp", verifyOtp);
 router.post("/login", login);
 router.post("/adminlogin", adminlogin);
 router.get("/getCurrentRole",authAdmin, getCurrentRole);
+router.get("/getCurrentUser",authUser, getCurrentUser);
 router.get("/getAllUsers", authAdmin , getAllUsers);
 
 // card routes

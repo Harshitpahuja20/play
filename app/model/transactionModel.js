@@ -4,13 +4,12 @@ const transactionSchema = new mongoose.Schema(
   {
     amount: {
       type: Number,
-      required: true,
+
       min: 0,
     },
     type: {
       type: String,
       enum: ["deposit", "withdraw"],
-      required: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -19,7 +18,6 @@ const transactionSchema = new mongoose.Schema(
     handledBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // or "Admin" if you use a separate model
-      required: true,
     },
     status: {
       type: String,

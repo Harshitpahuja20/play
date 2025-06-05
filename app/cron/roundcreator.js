@@ -8,13 +8,19 @@ function getComboDate(offsetHours = 0) {
   const now = new Date();
   now.setUTCMinutes(0, 0, 0); // Set minutes, seconds, and milliseconds to 0 for clean hour
   now.setUTCHours(now.getUTCHours() + offsetHours); // Adjust by offsetHours if necessary
+  
+  // Fix for crossing midnight between days (to handle round creation after 11 PM)
+  if (offsetHours === 0 && now.getUTCHours() === 0) {
+    now.setUTCDate(now.getUTCDate() + 1); // Move to the next day
+  }
+  
   return now;
 }
 
-// Close previous round and create next round at minute 55
+// Cron job to close the previous round and create the next one
 cron.schedule("55 * * * *", async () => {
   console.log(`[CRON 55] Starting close/create rounds at ${new Date().toISOString()}`);
-
+  
   try {
     const prevRoundCombo = getComboDate(-1); // Get the previous round date-time
     const currentCombo = getComboDate(0);   // Get the current round date-time
@@ -23,13 +29,14 @@ cron.schedule("55 * * * *", async () => {
 
     // 1. Find previous round based on combo
     let prevRound = await roundsModel.findOne({ combo: prevRoundCombo });
+    console.log(`[CRON 55] Found previous round: ${prevRound ? prevRound._id : 'None'}`);
 
     if (!prevRound) {
       // If previous round doesn't exist, create it as closed
       const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
-      // Create the previous round with both date, time and combo
+      // Create the previous round with both date, time, and combo
       const date = new Date(prevRoundCombo.getUTCFullYear(), prevRoundCombo.getUTCMonth(), prevRoundCombo.getUTCDate());  // Set to midnight
       const time = new Date(prevRoundCombo);  // Use the same date but with the specific time
 
@@ -42,6 +49,7 @@ cron.schedule("55 * * * *", async () => {
       });
       console.log(`[CRON 55] Previous round missing — created and closed: ${prevRoundCombo.toISOString()}`);
     } else if (!prevRound.isClosed) {
+      // Close the previous round if it's not closed
       prevRound.isClosed = true;
       await prevRound.save();
       console.log(`[CRON 55] Closed previous round: ${prevRoundCombo.toISOString()}`);
@@ -51,6 +59,8 @@ cron.schedule("55 * * * *", async () => {
 
     // 2. Create the next round if it doesn't exist
     const existsNext = await roundsModel.findOne({ combo: currentCombo });
+    console.log(`[CRON 55] Found next round: ${existsNext ? existsNext._id : 'None'}`);
+    
     if (!existsNext) {
       const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
@@ -58,10 +68,11 @@ cron.schedule("55 * * * *", async () => {
       const date = new Date(currentCombo.getUTCFullYear(), currentCombo.getUTCMonth(), currentCombo.getUTCDate());  // Set to midnight
       const time = new Date(currentCombo);  // Use the same date but with the specific time
 
+      // Create the next round with both date, time, and combo
       await roundsModel.create({
-        date: date,       // Save only date part (e.g., 2025-05-15)
-        time: time,       // Save specific time part (e.g., 2025-05-15T14:00:00.000Z)
-        combo: time,      // combo will be the full date-time (e.g., 2025-05-15T14:00:00.000Z)
+        date: date,
+        time: time,
+        combo: time,
         roundId: nextRoundId,
         isClosed: false,
       });
@@ -74,10 +85,10 @@ cron.schedule("55 * * * *", async () => {
   }
 });
 
-// Process bets and assign winners at minute 59
+// Cron job to process bets and assign winners
 cron.schedule("59 * * * *", async () => {
   console.log(`[CRON 59] Starting bet processing at ${new Date().toISOString()}`);
-
+  
   try {
     const prevRoundCombo = getComboDate(-1);
 

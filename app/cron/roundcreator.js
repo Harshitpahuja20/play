@@ -14,12 +14,12 @@ function getComboDate(offsetHours = 0) {
   if (offsetHours === 0 && now.getUTCHours() === 0) {
     now.setUTCDate(now.getUTCDate() + 1); // Move to the next day
   }
-
+   console.log(`offset ${offsetHours} ${now}`)
   return now;
 }
 
 // Cron job to close the previous round and create the next one
-cron.schedule("55 * * * *", async () => {
+cron.schedule("* * * * *", async () => {
   console.log(`[CRON 55] Starting close/create rounds at ${new Date().toISOString()}`);
   
   try {

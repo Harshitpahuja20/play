@@ -14,60 +14,91 @@ function getComboDate(offsetHours = 0) {
   if (offsetHours === 0 && now.getUTCHours() === 0) {
     now.setUTCDate(now.getUTCDate() + 1); // Move to the next day
   }
-   console.log(`offset ${offsetHours} ${now}`)
+  console.log(`offset ${offsetHours} ${now}`);
   return now;
 }
 
 // Cron job to close the previous round and create the next one
 cron.schedule("55 * * * *", async () => {
-  console.log(`[CRON 55] Starting close/create rounds at ${new Date().toISOString()}`);
-  
+  console.log(
+    `[CRON 55] Starting close/create rounds at ${new Date().toISOString()}`
+  );
+
   try {
     const prevRoundCombo = getComboDate(0); // Get the previous round date-time
-    const currentCombo = getComboDate(1);   // Get the current round date-time
+    const currentCombo = getComboDate(1); // Get the current round date-time
 
-    console.log(`[CRON 55] prevRoundCombo: ${prevRoundCombo.toISOString()}, currentCombo: ${currentCombo.toISOString()}`);
+    console.log(
+      `[CRON 55] prevRoundCombo: ${prevRoundCombo.toISOString()}, currentCombo: ${currentCombo.toISOString()}`
+    );
 
     // 1. Find previous round based on combo
     let prevRound = await roundsModel.findOne({ combo: prevRoundCombo });
-    console.log(`[CRON 55] Found previous round: ${prevRound ? prevRound._id : 'None'}`);
+    console.log(
+      `[CRON 55] Found previous round: ${prevRound ? prevRound._id : "None"}`
+    );
 
     if (!prevRound) {
       // If previous round doesn't exist, create it as closed
-      const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
+      const lastRound = await roundsModel
+        .findOne()
+        .sort({ roundId: -1 })
+        .lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
       // Create the previous round with both date, time, and combo
-      const date = new Date(prevRoundCombo.getUTCFullYear(), prevRoundCombo.getUTCMonth(), prevRoundCombo.getUTCDate());  // Set to midnight
-      const time = new Date(prevRoundCombo);  // Use the same date but with the specific time
+      const date = new Date(
+        prevRoundCombo.getUTCFullYear(),
+        prevRoundCombo.getUTCMonth(),
+        prevRoundCombo.getUTCDate()
+      ); // Set to midnight
+      const time = new Date(prevRoundCombo); // Use the same date but with the specific time
 
       prevRound = await roundsModel.create({
-        date: date,       // Save only date part (e.g., 2025-05-15)
-        time: time,       // Save specific time part (e.g., 2025-05-15T14:00:00.000Z)
-        combo: time,      // combo will be the full date-time (e.g., 2025-05-15T14:00:00.000Z)
+        date: date, // Save only date part (e.g., 2025-05-15)
+        time: time, // Save specific time part (e.g., 2025-05-15T14:00:00.000Z)
+        combo: time, // combo will be the full date-time (e.g., 2025-05-15T14:00:00.000Z)
         roundId: nextRoundId,
         isClosed: true,
       });
-      console.log(`[CRON 55] Previous round missing — created and closed: ${prevRoundCombo.toISOString()}`);
+      console.log(
+        `[CRON 55] Previous round missing — created and closed: ${prevRoundCombo.toISOString()}`
+      );
     } else if (!prevRound.isClosed) {
       // Close the previous round if it's not closed
       prevRound.isClosed = true;
       await prevRound.save();
-      console.log(`[CRON 55] Closed previous round: ${prevRoundCombo.toISOString()}`);
+      console.log(
+        `[CRON 55] Closed previous round: ${prevRoundCombo.toISOString()}`
+      );
     } else {
-      console.log(`[CRON 55] Previous round already closed: ${prevRoundCombo.toISOString()}`);
+      console.log(
+        `[CRON 55] Previous round already closed: ${prevRoundCombo.toISOString()}`
+      );
     }
 
     // 2. Create the next round if it doesn't exist
     const existsNext = await roundsModel.findOne({ combo: currentCombo });
-    console.log(`[CRON 55] Found next round: ${existsNext ? existsNext._id : 'None'}`);
-    
+    console.log(
+      `[CRON 55] Found next round: ${existsNext ? existsNext._id : "None"}`
+    );
+
     if (!existsNext) {
-      const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
+      const lastRound = await roundsModel
+        .findOne()
+        .sort({ roundId: -1 })
+        .lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
-      const date = new Date(currentCombo.getUTCFullYear(), currentCombo.getUTCMonth(), currentCombo.getUTCDate());  // Set to midnight
-      const time = new Date(currentCombo);  // Use the same date but with the specific time
+      const date = new Date(
+        Date.UTC(
+          currentCombo.getUTCFullYear(),
+          currentCombo.getUTCMonth(),
+          currentCombo.getUTCDate()
+        )
+      );
+
+      const time = new Date(currentCombo); // Use the same date but with the specific time
 
       // Create the next round with both date, time, and combo
       await roundsModel.create({
@@ -77,9 +108,13 @@ cron.schedule("55 * * * *", async () => {
         roundId: nextRoundId,
         isClosed: false,
       });
-      console.log(`[CRON 55] Created next round: ${currentCombo.toISOString()}, roundId: ${nextRoundId}`);
+      console.log(
+        `[CRON 55] Created next round: ${currentCombo.toISOString()}, roundId: ${nextRoundId}`
+      );
     } else {
-      console.log(`[CRON 55] Next round already exists: ${currentCombo.toISOString()}`);
+      console.log(
+        `[CRON 55] Next round already exists: ${currentCombo.toISOString()}`
+      );
     }
   } catch (error) {
     console.error("[CRON 55] Error:", error);
@@ -88,8 +123,10 @@ cron.schedule("55 * * * *", async () => {
 
 // Cron job to process bets and assign winners
 cron.schedule("59 * * * *", async () => {
-  console.log(`[CRON 59] Starting bet processing at ${new Date().toISOString()}`);
-  
+  console.log(
+    `[CRON 59] Starting bet processing at ${new Date().toISOString()}`
+  );
+
   try {
     const prevRoundCombo = getComboDate(0);
 
@@ -100,7 +137,9 @@ cron.schedule("59 * * * *", async () => {
     });
 
     if (!round) {
-      console.log(`[CRON 59] No closed round found for processing: ${prevRoundCombo.toISOString()}`);
+      console.log(
+        `[CRON 59] No closed round found for processing: ${prevRoundCombo.toISOString()}`
+      );
       return;
     }
 
@@ -120,8 +159,11 @@ cron.schedule("59 * * * *", async () => {
 
       if (cardBets.length === 0) {
         // No bets - pick random card
-        const [randomCard] = await cardModel.aggregate([{ $sample: { size: 1 } }]);
-        if (!randomCard?._id) throw new Error("No cards available to assign as winner");
+        const [randomCard] = await cardModel.aggregate([
+          { $sample: { size: 1 } },
+        ]);
+        if (!randomCard?._id)
+          throw new Error("No cards available to assign as winner");
         round.cardId = randomCard._id;
       } else {
         // Assign card with lowest total bets as winner
@@ -129,7 +171,11 @@ cron.schedule("59 * * * *", async () => {
       }
 
       await round.save();
-      console.log(`[CRON 59] Assigned cardId ${round.cardId} to round ${round.combo.toISOString()}`);
+      console.log(
+        `[CRON 59] Assigned cardId ${
+          round.cardId
+        } to round ${round.combo.toISOString()}`
+      );
     }
 
     const winningCardId = round.cardId.toString();
@@ -163,7 +209,9 @@ cron.schedule("59 * * * *", async () => {
 
     if (bulkUserOps.length > 0) {
       await User.bulkWrite(bulkUserOps);
-      console.log(`[CRON 59] Updated balances for ${bulkUserOps.length} winners.`);
+      console.log(
+        `[CRON 59] Updated balances for ${bulkUserOps.length} winners.`
+      );
     }
 
     if (bulkBetOps.length > 0) {
@@ -171,7 +219,9 @@ cron.schedule("59 * * * *", async () => {
       console.log(`[CRON 59] Updated results for ${bulkBetOps.length} bets.`);
     }
 
-    console.log(`[CRON 59] Round ${round.combo.toISOString()} processing complete.`);
+    console.log(
+      `[CRON 59] Round ${round.combo.toISOString()} processing complete.`
+    );
   } catch (error) {
     console.error("[CRON 59] Error:", error);
   }

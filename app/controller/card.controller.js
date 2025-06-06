@@ -30,12 +30,7 @@ exports.addCard = async (req, res) => {
 
       await newCard.save();
 
-      return responsestatusdata(
-        res,
-        true,
-        "Card added successfully",
-        newCard
-      );
+      return responsestatusdata(res, true, "Card added successfully", newCard);
     } catch (error) {
       console.error(error);
       return responsestatusmessage(res, false, "Something went wrong.");
@@ -49,30 +44,41 @@ exports.getCards = async (req, res) => {
     const currentRoundId = new Date(getCurrentRoundId());
     const previousRoundId = new Date(getPreviousRoundId());
 
-    console.log(currentRoundId)
-    console.log(previousRoundId)
+    console.log(currentRoundId);
+    console.log(previousRoundId);
 
     const [cards, currentRound, previousRound] = await Promise.all([
-      Card.find().sort({createdAt : 1}),
+      Card.find().sort({ createdAt: 1 }),
       roundsModel.findOne({ combo: currentRoundId }),
-      roundsModel.findOne({ combo: previousRoundId }).populate({
-        path: "cardId",
-        select: "image name", // only fetch needed fields
-      }),
+      roundsModel.aggregate([
+        {
+          $match: { combo: previousRoundId },
+        },
+        {
+          $lookup: {
+            from: "cards",
+            localField: "cardId",
+            foreignField: "_id",
+            as: "card",
+          },
+        },
+        { $unwind: { path: "$card", preserveNullAndEmptyArrays: true } },
+      ]),
     ]);
-
     if (!cards || cards.length === 0) {
       return responsestatusmessage(res, false, "No cards found.");
     }
 
     // Format previousRound data for consistent shape (optional)
-    const formattedPreviousRound = previousRound
+    const formattedPreviousRound = previousRound?.length
       ? {
-          _id: previousRound._id,
-          image: previousRound.cardId?.image || null,
-          name: previousRound.cardId?.name || null,
+          _id: previousRound[0]?._id,
+          image: previousRound[0]?.card?.image || null,
+          name: previousRound[0]?.card?.name || null,
         }
       : null;
+
+
 
     return responsestatusdata(res, true, "Cards retrieved successfully", {
       cards,
@@ -94,12 +100,7 @@ exports.getAdminCards = async (req, res) => {
       return responsestatusmessage(res, false, "No cards found.");
     }
 
-    return responsestatusdata(
-      res,
-      true,
-      "Cards retrieved successfully",
-      cards
-    );
+    return responsestatusdata(res, true, "Cards retrieved successfully", cards);
   } catch (error) {
     console.error(error);
     return responsestatusmessage(res, false, "Something went wrong.");
@@ -114,7 +115,6 @@ function generateImageName(originalName) {
 }
 
 function getCurrentRoundId(now = new Date()) {
-
   // Adjust the time for IST
   now.setUTCHours(now.getUTCHours());
 
@@ -127,11 +127,10 @@ function getCurrentRoundId(now = new Date()) {
 }
 
 function getPreviousRoundId(now = new Date()) {
-
   // Clone the date and adjust the time for IST
   const prevHourDate = new Date(now);
   prevHourDate.setUTCHours(prevHourDate.getUTCHours());
-  
+
   // Subtract one hour from the adjusted time
   prevHourDate.setHours(prevHourDate.getHours() - 1);
 
@@ -142,4 +141,3 @@ function getPreviousRoundId(now = new Date()) {
 
   return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }
-

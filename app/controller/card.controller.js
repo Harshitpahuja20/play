@@ -53,7 +53,7 @@ exports.getCards = async (req, res) => {
     console.log(previousRoundId)
 
     const [cards, currentRound, previousRound] = await Promise.all([
-      Card.find(),
+      Card.find().sort({createdAt : 1}),
       roundsModel.findOne({ combo: currentRoundId }),
       roundsModel.findOne({ combo: previousRoundId }).populate({
         path: "cardId",

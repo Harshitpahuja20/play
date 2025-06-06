@@ -6,14 +6,15 @@ const cardModel = require("../model/card.model");
 
 function getComboDate(offsetHours = 0) {
   const now = new Date();
+  const IST_OFFSET = 5.5; // IST is UTC+5:30
   now.setUTCMinutes(0, 0, 0); // Set minutes, seconds, and milliseconds to 0 for clean hour
-  now.setUTCHours(now.getUTCHours() + offsetHours); // Adjust by offsetHours if necessary
-  
+  now.setUTCHours(now.getUTCHours() + offsetHours + IST_OFFSET); // Adjust by UTC offset + IST
+
   // Fix for crossing midnight between days (to handle round creation after 11 PM)
   if (offsetHours === 0 && now.getUTCHours() === 0) {
     now.setUTCDate(now.getUTCDate() + 1); // Move to the next day
   }
-  
+
   return now;
 }
 
@@ -175,3 +176,4 @@ cron.schedule("59 * * * *", async () => {
     console.error("[CRON 59] Error:", error);
   }
 });
+``

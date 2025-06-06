@@ -85,7 +85,6 @@ exports.getCards = async (req, res) => {
   }
 };
 
-
 exports.getAdminCards = async (req, res) => {
   try {
     const cards = await Card.find();
@@ -115,6 +114,11 @@ function generateImageName(originalName) {
 }
 
 function getCurrentRoundId(now = new Date()) {
+  const IST_OFFSET = 5.5; // IST is UTC+5:30
+
+  // Adjust the time for IST
+  now.setUTCHours(now.getUTCHours() + IST_OFFSET);
+
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
@@ -124,10 +128,13 @@ function getCurrentRoundId(now = new Date()) {
 }
 
 function getPreviousRoundId(now = new Date()) {
-  // Clone the date so we don't mutate the original
-  const prevHourDate = new Date(now);
+  const IST_OFFSET = 5.5; // IST is UTC+5:30
 
-  // Subtract one hour
+  // Clone the date and adjust the time for IST
+  const prevHourDate = new Date(now);
+  prevHourDate.setUTCHours(prevHourDate.getUTCHours() + IST_OFFSET);
+  
+  // Subtract one hour from the adjusted time
   prevHourDate.setHours(prevHourDate.getHours() - 1);
 
   const year = prevHourDate.getFullYear();
@@ -137,3 +144,4 @@ function getPreviousRoundId(now = new Date()) {
 
   return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }
+

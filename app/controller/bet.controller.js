@@ -32,6 +32,7 @@ exports.placeBet = async (req, res) => {
     ]);
     if (!cardExists) return responsestatusmessage(res, false, "Card not found.");
     if (!roundExists) return responsestatusmessage(res, false, "Round not found.");
+    if (roundExists?.isClosed) return responsestatusmessage(res, false, "Bet Closed.");
 
     /* ── fetch user & balance check inside the session ────────────*/
     const user = await User.findById(userId).session(session);

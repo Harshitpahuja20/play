@@ -88,11 +88,13 @@ exports.getUserTransactions = async (req, res) => {
     matchConditions = {
       type,
       $or: [{ userId: { $exists: false } }, { userId: userIdObj }],
+      createdAt: { $gt: user?.createdAt || new Date(0) },
     };
   } else if (type === "withdraw") {
     matchConditions = {
       type,
       userId: userIdObj,
+      createdAt: { $gt: user?.createdAt || new Date(0) },
     };
   }
 

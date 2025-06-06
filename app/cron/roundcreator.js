@@ -19,7 +19,7 @@ function getComboDate(offsetHours = 0) {
 }
 
 // Cron job to close the previous round and create the next one
-cron.schedule("* * * * *", async () => {
+cron.schedule("55 * * * *", async () => {
   console.log(`[CRON 55] Starting close/create rounds at ${new Date().toISOString()}`);
   
   try {

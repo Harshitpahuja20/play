@@ -23,8 +23,8 @@ cron.schedule("* * * * *", async () => {
   console.log(`[CRON 55] Starting close/create rounds at ${new Date().toISOString()}`);
   
   try {
-    const prevRoundCombo = getComboDate(-1); // Get the previous round date-time
-    const currentCombo = getComboDate(0);   // Get the current round date-time
+    const prevRoundCombo = getComboDate(0); // Get the previous round date-time
+    const currentCombo = getComboDate(1);   // Get the current round date-time
 
     console.log(`[CRON 55] prevRoundCombo: ${prevRoundCombo.toISOString()}, currentCombo: ${currentCombo.toISOString()}`);
 
@@ -91,7 +91,7 @@ cron.schedule("59 * * * *", async () => {
   console.log(`[CRON 59] Starting bet processing at ${new Date().toISOString()}`);
   
   try {
-    const prevRoundCombo = getComboDate(-1);
+    const prevRoundCombo = getComboDate(0);
 
     // Ensure previous round is closed
     const round = await roundsModel.findOne({
@@ -176,4 +176,3 @@ cron.schedule("59 * * * *", async () => {
     console.error("[CRON 59] Error:", error);
   }
 });
-``

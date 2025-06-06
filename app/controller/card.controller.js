@@ -114,10 +114,9 @@ function generateImageName(originalName) {
 }
 
 function getCurrentRoundId(now = new Date()) {
-  const IST_OFFSET = 5.5; // IST is UTC+5:30
 
   // Adjust the time for IST
-  now.setUTCHours(now.getUTCHours() + IST_OFFSET);
+  now.setUTCHours(now.getUTCHours());
 
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -128,11 +127,10 @@ function getCurrentRoundId(now = new Date()) {
 }
 
 function getPreviousRoundId(now = new Date()) {
-  const IST_OFFSET = 5.5; // IST is UTC+5:30
 
   // Clone the date and adjust the time for IST
   const prevHourDate = new Date(now);
-  prevHourDate.setUTCHours(prevHourDate.getUTCHours() + IST_OFFSET);
+  prevHourDate.setUTCHours(prevHourDate.getUTCHours());
   
   // Subtract one hour from the adjusted time
   prevHourDate.setHours(prevHourDate.getHours() - 1);

@@ -23,7 +23,7 @@ function getRoundedISTHourDate(offsetHours = 0) {
   ist.setHours(ist.getHours() + offsetHours);
 
   // Reconstruct UTC equivalent
-  return new Date(ist.getTime() - 5.5 * 60 * 60 * 1000);
+  return new Date(ist.getTime() - .5 * 60 * 60 * 1000);
 }
 
 // CRON to close current round and create next round at :55 of every hour

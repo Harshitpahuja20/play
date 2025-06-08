@@ -30,6 +30,7 @@ exports.placeBet = async (req, res) => {
       Card.exists({ _id: cardId }),
       Round.exists({ _id: roundId }),
     ]);
+    console.log(JSON.stringify(roundExists))
     if (!cardExists) return responsestatusmessage(res, false, "Card not found.");
     if (!roundExists) return responsestatusmessage(res, false, "Round not found.");
     if (roundExists?.isClosed) return responsestatusmessage(res, false, "Bet Closed.");

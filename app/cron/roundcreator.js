@@ -25,12 +25,13 @@ function getRoundedISTHourDate(offsetHours = 0) {
 }
 
 function logCombo(label, date) {
+  console.log(`original date ${date}`)
   const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
   console.log(`[${label}] UTC: ${date.toISOString()}, IST: ${ist.toISOString()}`);
 }
 
 // CRON to close current round and create next round at :55 of every hour
-cron.schedule("40 * * * *", async () => {
+cron.schedule("1 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {

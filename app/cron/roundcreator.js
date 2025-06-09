@@ -9,19 +9,48 @@ const cardModel = require("../model/card.model");
  * @param {number} offsetHours
  * @returns {Date} Date object representing IST hour start
  */
-function getRoundedISTHourDate(offsetHours = 0) {
-  const now = new Date();
+function getNextRoundId(now = new Date()) {
+  // Clone the date and adjust the time for IST
+  const nextHourDate = new Date(now);
+  nextHourDate.setUTCHours(nextHourDate.getUTCHours());
 
-  // Create a new UTC date object rounded to the hour
-  const utcDate = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    now.getUTCHours() + offsetHours, // apply hour offset
-    0, 0, 0 // round minutes, seconds, ms
-  ));
+  // Add one hour to the adjusted time
+  nextHourDate.setHours(nextHourDate.getHours() + 1);
 
-  return utcDate;
+  const year = nextHourDate.getFullYear();
+  const month = String(nextHourDate.getMonth() + 1).padStart(2, "0");
+  const day = String(nextHourDate.getDate()).padStart(2, "0");
+  const hour = String(nextHourDate.getHours()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+}
+
+function getCurrentRoundId(now = new Date()) {
+  // Adjust the time for IST
+  now.setUTCHours(now.getUTCHours());
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hour = String(now.getHours()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+}
+
+function getPreviousRoundId(now = new Date()) {
+  // Clone the date and adjust the time for IST
+  const prevHourDate = new Date(now);
+  prevHourDate.setUTCHours(prevHourDate.getUTCHours());
+
+  // Subtract one hour from the adjusted time
+  prevHourDate.setHours(prevHourDate.getHours() - 1);
+
+  const year = prevHourDate.getFullYear();
+  const month = String(prevHourDate.getMonth() + 1).padStart(2, "0");
+  const day = String(prevHourDate.getDate()).padStart(2, "0");
+  const hour = String(prevHourDate.getHours()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }
 
 function logCombo(label, date) {
@@ -31,12 +60,12 @@ function logCombo(label, date) {
 }
 
 // CRON to close current round and create next round at :55 of every hour
-cron.schedule("5 * * * *", async () => {
+cron.schedule("15 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {
-    const prevCombo = getRoundedISTHourDate(0);
-    const nextCombo = getRoundedISTHourDate(1);
+    const prevCombo = getCurrentRoundId();
+    const nextCombo = getNextRoundId();
 
     logCombo("Prev Combo", prevCombo);
     logCombo("Next Combo", nextCombo);
@@ -94,7 +123,7 @@ cron.schedule("59 * * * *", async () => {
   console.log(`\n[CRON 59] Triggered at ${new Date().toISOString()}`);
 
   try {
-    const combo = getRoundedISTHourDate(0);
+    const combo = getCurrentRoundId();
     const round = await roundsModel.findOne({ combo, isClosed: true });
 
     if (!round) {

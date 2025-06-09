@@ -126,18 +126,34 @@ function getCurrentRoundId(now = new Date()) {
   return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }
 
-function getPreviousRoundId(now = new Date()) {
+  function getPreviousRoundId(now = new Date()) {
+    // Clone the date and adjust the time for IST
+    const prevHourDate = new Date(now);
+    prevHourDate.setUTCHours(prevHourDate.getUTCHours());
+
+    // Subtract one hour from the adjusted time
+    prevHourDate.setHours(prevHourDate.getHours() - 1);
+
+    const year = prevHourDate.getFullYear();
+    const month = String(prevHourDate.getMonth() + 1).padStart(2, "0");
+    const day = String(prevHourDate.getDate()).padStart(2, "0");
+    const hour = String(prevHourDate.getHours()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+  }
+
+function getNextRoundId(now = new Date()) {
   // Clone the date and adjust the time for IST
-  const prevHourDate = new Date(now);
-  prevHourDate.setUTCHours(prevHourDate.getUTCHours());
+  const nextHourDate = new Date(now);
+  nextHourDate.setUTCHours(nextHourDate.getUTCHours());
 
-  // Subtract one hour from the adjusted time
-  prevHourDate.setHours(prevHourDate.getHours() - 1);
+  // Add one hour to the adjusted time
+  nextHourDate.setHours(nextHourDate.getHours() + 1);
 
-  const year = prevHourDate.getFullYear();
-  const month = String(prevHourDate.getMonth() + 1).padStart(2, "0");
-  const day = String(prevHourDate.getDate()).padStart(2, "0");
-  const hour = String(prevHourDate.getHours()).padStart(2, "0");
+  const year = nextHourDate.getFullYear();
+  const month = String(nextHourDate.getMonth() + 1).padStart(2, "0");
+  const day = String(nextHourDate.getDate()).padStart(2, "0");
+  const hour = String(nextHourDate.getHours()).padStart(2, "0");
 
   return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 }

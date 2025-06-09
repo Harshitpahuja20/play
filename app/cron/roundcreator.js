@@ -5,43 +5,40 @@ const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
 /**
- * Get the current IST time rounded to the start of the hour
- * @param {number} offsetHours
- * @returns {Date} Date with time 00 minutes, 00 seconds, 000 ms
+ * Get the current IST time rounded to the start of the hour, then convert back to UTC
+ * @param {number} offsetHours Offset in hours from the current IST time
+ * @returns {Date} UTC date equivalent of rounded IST hour
  */
 function getRoundedISTHourDate(offsetHours = 0) {
-  const nowUTC = new Date();
-
-  // Convert to IST: UTC + 5.5 hours
-  const istMillis = nowUTC.getTime() + 5.5 * 60 * 60 * 1000;
-  const ist = new Date(istMillis);
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(now.getTime() + istOffset);
 
   // Round to start of the hour
-  ist.setMinutes(0, 0, 0);
+  istTime.setMinutes(0, 0, 0);
+  istTime.setHours(istTime.getHours() + offsetHours);
 
-  // Apply hour offset if needed
-  ist.setHours(ist.getHours() + offsetHours);
+  // Convert back to UTC
+  return new Date(istTime.getTime() - istOffset);
+}
 
-  // Reconstruct UTC equivalent
-  return new Date(ist.getTime() - .5 * 60 * 60 * 1000);
+function logCombo(label, date) {
+  const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+  console.log(`[${label}] UTC: ${date.toISOString()}, IST: ${ist.toISOString()}`);
 }
 
 // CRON to close current round and create next round at :55 of every hour
 cron.schedule("55 * * * *", async () => {
-  console.log(`[CRON 55] Triggered at ${new Date().toISOString()}`);
+  console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {
-    const prevCombo = getRoundedISTHourDate(0); // current hour
-    const nextCombo = getRoundedISTHourDate(1); // next hour
-
-    const logCombo = (label, date) => {
-      console.log(`[CRON 55] ${label}: ${date.toISOString()}`);
-    };
+    const prevCombo = getRoundedISTHourDate(0);
+    const nextCombo = getRoundedISTHourDate(1);
 
     logCombo("Prev Combo", prevCombo);
     logCombo("Next Combo", nextCombo);
 
-    // ===== Close Previous Round (if needed) =====
+    // ===== Close Previous Round =====
     let prevRound = await roundsModel.findOne({ combo: prevCombo });
 
     if (!prevRound) {
@@ -56,16 +53,16 @@ cron.schedule("55 * * * *", async () => {
         isClosed: true,
       });
 
-      console.log(`[CRON 55] Previous round missing — created & closed: ${prevCombo.toISOString()}`);
+      console.log(`[CRON 55] Previous round missing — created & closed.`);
     } else if (!prevRound.isClosed) {
       prevRound.isClosed = true;
       await prevRound.save();
-      console.log(`[CRON 55] Closed existing previous round: ${prevCombo.toISOString()}`);
+      console.log(`[CRON 55] Closed existing previous round.`);
     } else {
       console.log(`[CRON 55] Previous round already closed.`);
     }
 
-    // ===== Create Next Round (if needed) =====
+    // ===== Create Next Round =====
     const existsNext = await roundsModel.findOne({ combo: nextCombo });
 
     if (!existsNext) {
@@ -80,7 +77,7 @@ cron.schedule("55 * * * *", async () => {
         isClosed: false,
       });
 
-      console.log(`[CRON 55] Created next round: ${nextCombo.toISOString()} (roundId: ${nextRoundId})`);
+      console.log(`[CRON 55] Created next round (roundId: ${nextRoundId})`);
     } else {
       console.log(`[CRON 55] Next round already exists.`);
     }
@@ -91,10 +88,10 @@ cron.schedule("55 * * * *", async () => {
 
 // CRON to process bets and assign winners at :59 of every hour
 cron.schedule("59 * * * *", async () => {
-  console.log(`[CRON 59] Triggered at ${new Date().toISOString()}`);
+  console.log(`\n[CRON 59] Triggered at ${new Date().toISOString()}`);
 
   try {
-    const combo = getRoundedISTHourDate(0); // current hour
+    const combo = getRoundedISTHourDate(0);
     const round = await roundsModel.findOne({ combo, isClosed: true });
 
     if (!round) {
@@ -102,7 +99,7 @@ cron.schedule("59 * * * *", async () => {
       return;
     }
 
-    // Assign winning card if not already assigned
+    // ===== Assign Winning Card (if not already) =====
     if (!round.cardId) {
       const cardBets = await betModel.aggregate([
         { $match: { roundId: round._id } },
@@ -128,7 +125,7 @@ cron.schedule("59 * * * *", async () => {
       console.log(`[CRON 59] Assigned cardId ${round.cardId} to round.`);
     }
 
-    // Process all bets
+    // ===== Process All Bets =====
     const bets = await betModel.find({ roundId: round._id });
     const bulkUserOps = [];
     const bulkBetOps = [];

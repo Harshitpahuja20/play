@@ -17,10 +17,11 @@ function getRoundedISTHourDate(offsetHours = 0) {
   const istTime = new Date(now.getTime() + istOffset);
 
   // Round IST time to the start of the hour
-  istTime.setMinutes(0, 0, 0);
+  
 
   // Apply hour offset in IST
   istTime.setHours(istTime.getHours() + offsetHours);
+  istTime.setMinutes(0, 0, 0);
 
   // Return this as-is (IST-based Date object)
   return istTime;
@@ -32,7 +33,7 @@ function logCombo(label, date) {
 }
 
 // CRON to close current round and create next round at :55 of every hour
-cron.schedule("2 * * * *", async () => {
+cron.schedule("25 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {

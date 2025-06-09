@@ -12,18 +12,18 @@ const cardModel = require("../model/card.model");
 function getRoundedISTHourDate(offsetHours = 0) {
   const now = new Date();
 
-  // Get UTC time + IST offset
+  // IST offset in milliseconds
   const istOffset = 5.5 * 60 * 60 * 1000;
-  const istTime = new Date(now.getTime() + istOffset);
 
-  // Round IST time to the start of the hour
-  
+  // Convert current UTC time to IST
+  const istTime = new Date(now.getTime() + istOffset);
 
   // Apply hour offset in IST
   istTime.setHours(istTime.getHours() + offsetHours);
+
+  // Ensure minutes, seconds, ms are set to 0
   istTime.setMinutes(0, 0, 0);
 
-  // Return this as-is (IST-based Date object)
   return istTime;
 }
 
@@ -33,7 +33,7 @@ function logCombo(label, date) {
 }
 
 // CRON to close current round and create next round at :55 of every hour
-cron.schedule("25 * * * *", async () => {
+cron.schedule("30 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {

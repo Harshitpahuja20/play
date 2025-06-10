@@ -1,46 +1,56 @@
 const cron = require("node-cron");
-const { DateTime } = require("luxon");
 const roundsModel = require("../model/rounds.model");
 const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
-const IST_ZONE = "Asia/Kolkata";
+// Helpers
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 /**
- * Gets the current round datetime in IST, rounded to the current hour.
+ * Returns a Date object aligned to the current IST hour.
  */
-function getCurrentRoundId() {
-  const nowIST = DateTime.now().setZone(IST_ZONE).startOf("hour");
-  return nowIST.toUTC().toJSDate();
+function getCurrentRoundId(now = new Date()) {
+  const istTime = new Date(now.getTime() + IST_OFFSET_MS);
+  istTime.setMinutes(0, 0, 0); // Round to start of hour
+  return new Date(istTime.getTime() - IST_OFFSET_MS); // Return as UTC-based Date object
 }
 
 /**
- * Gets the next round datetime in IST (next hour), handling day rollover.
+ * Returns a Date object aligned to the next IST hour.
  */
-function getNextRoundId() {
-  const nextIST = DateTime.now().setZone(IST_ZONE).plus({ hours: 1 }).startOf("hour");
-  return nextIST.toUTC().toJSDate();
+function getNextRoundId(now = new Date()) {
+  const istTime = new Date(now.getTime() + IST_OFFSET_MS);
+  istTime.setMinutes(0, 0, 0);
+  istTime.setHours(istTime.getHours() + 1); // Add one hour
+  return new Date(istTime.getTime() - IST_OFFSET_MS);
 }
 
 /**
- * Gets the previous round datetime in IST (previous hour).
+ * Returns a Date object aligned to the previous IST hour.
  */
-function getPreviousRoundId() {
-  const prevIST = DateTime.now().setZone(IST_ZONE).minus({ hours: 1 }).startOf("hour");
-  return prevIST.toUTC().toJSDate();
+function getPreviousRoundId(now = new Date()) {
+  const istTime = new Date(now.getTime() + IST_OFFSET_MS);
+  istTime.setMinutes(0, 0, 0);
+  istTime.setHours(istTime.getHours() - 1);
+  return new Date(istTime.getTime() - IST_OFFSET_MS);
 }
 
 /**
- * Logs UTC and IST time for debugging.
+ * Returns ISO string with +05:30 manually appended (for display only).
  */
+function getISTISOString(date) {
+  const istDate = new Date(date.getTime() + IST_OFFSET_MS);
+  const iso = istDate.toISOString().replace("Z", "+05:30");
+  return iso;
+}
+
 function logCombo(label, utcDate) {
-  const ist = DateTime.fromJSDate(utcDate).setZone(IST_ZONE);
-  console.log(`[${label}] UTC: ${utcDate.toISOString()}, IST: ${ist.toISO()}`);
+  console.log(`[${label}] UTC: ${utcDate.toISOString()}, IST: ${getISTISOString(utcDate)}`);
 }
 
 // CRON to close current round and create next round at :55 IST every hour
-cron.schedule("20 * * * *", async () => {
+cron.schedule("27 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {
@@ -99,7 +109,7 @@ cron.schedule("20 * * * *", async () => {
 });
 
 // CRON to process bets and assign winners at :59 IST every hour
-cron.schedule("59 * * * *", async () => {
+cron.schedule("29 * * * *", async () => {
   console.log(`\n[CRON 59] Triggered at ${new Date().toISOString()}`);
 
   try {
@@ -111,7 +121,7 @@ cron.schedule("59 * * * *", async () => {
       return;
     }
 
-    // ===== Assign Winning Card (if not already) =====
+    // ===== Assign Winning Card =====
     if (!round.cardId) {
       const cardBets = await betModel.aggregate([
         { $match: { roundId: round._id } },

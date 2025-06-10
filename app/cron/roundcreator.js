@@ -5,7 +5,7 @@ const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
 // Constant for IST offset in milliseconds
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const IST_OFFSET_MS = 5 * 60 * 60 * 1000;
 
 /**
  * Get UTC Date aligned to the current IST hour.
@@ -13,7 +13,7 @@ const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 function getCurrentRoundId(now = new Date()) {
   const ist = new Date(now.getTime() + IST_OFFSET_MS);
   ist.setMinutes(0, 0, 0);
-  return new Date(ist.getTime() - IST_OFFSET_MS);
+  return new Date(ist.getTime());
 }
 
 /**
@@ -23,7 +23,7 @@ function getNextRoundId(now = new Date()) {
   const ist = new Date(now.getTime() + IST_OFFSET_MS);
   ist.setMinutes(0, 0, 0);
   ist.setHours(ist.getHours() + 1);
-  return new Date(ist.getTime() - IST_OFFSET_MS);
+  return new Date(ist.getTime());
 }
 
 /**
@@ -52,7 +52,7 @@ function logCombo(label, utcDate) {
 }
 
 // CRON to close current round and create next round at :55 IST every hour
-cron.schedule("33 * * * *", async () => {
+cron.schedule("36 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {

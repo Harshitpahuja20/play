@@ -123,7 +123,7 @@ function getCurrentRoundId(now = new Date()) {
   const day = String(now.getDate()).padStart(2, "0");
   const hour = String(now.getHours()).padStart(2, "0");
 
-  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+  return `${year}-${month}-${day}T${hour}:30:00.000Z`;
 }
 
   function getPreviousRoundId(now = new Date()) {
@@ -139,7 +139,7 @@ function getCurrentRoundId(now = new Date()) {
     const day = String(prevHourDate.getDate()).padStart(2, "0");
     const hour = String(prevHourDate.getHours()).padStart(2, "0");
 
-    return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+    return `${year}-${month}-${day}T${hour}:30:00.000Z`;
   }
 
 function getNextRoundId(now = new Date()) {

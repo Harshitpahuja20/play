@@ -52,7 +52,7 @@ function logCombo(label, utcDate) {
 }
 
 // CRON to close current round and create next round at :55 IST every hour
-cron.schedule("36 * * * *", async () => {
+cron.schedule("55 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {

@@ -5,69 +5,59 @@ const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
 /**
- * Returns a Date object representing the next hour (UTC).
- * @param {Date} now
- * @returns {Date}
+ * Converts a UTC date to IST.
+ * @param {Date} date
+ * @returns {Date} IST date
  */
-function getNextRoundId(now = new Date()) {
-  const nextHourDate = new Date(now);
-  nextHourDate.setUTCHours(nextHourDate.getUTCHours() + 1);
-
-  return new Date(Date.UTC(
-    nextHourDate.getUTCFullYear(),
-    nextHourDate.getUTCMonth(),
-    nextHourDate.getUTCDate(),
-    nextHourDate.getUTCHours(),
-    0,
-    0,
-    0
-  ));
+function toIST(date) {
+  return new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
 }
 
 /**
- * Returns a Date object representing the current hour (UTC).
- * @param {Date} now
+ * Converts IST date to UTC.
+ * @param {Date} date
  * @returns {Date}
+ */
+function fromIST(date) {
+  return new Date(date.getTime() - 5.5 * 60 * 60 * 1000);
+}
+
+/**
+ * Gets the current round date in IST (aligned to the current hour).
  */
 function getCurrentRoundId(now = new Date()) {
-  return new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    now.getUTCHours(),
-    0,
-    0,
-    0
-  ));
+  const istNow = toIST(now);
+  istNow.setMinutes(0, 0, 0); // round to hour
+  return fromIST(istNow); // store as UTC but based on IST hour
 }
 
 /**
- * Returns a string representing the previous hour (UTC).
- * @param {Date} now
- * @returns {string}
+ * Gets the next round date in IST (next hour).
  */
-function getPreviousRoundId(now = new Date()) {
-  const prevHourDate = new Date(now);
-  prevHourDate.setUTCHours(prevHourDate.getUTCHours() - 1);
-
-  return new Date(Date.UTC(
-    prevHourDate.getUTCFullYear(),
-    prevHourDate.getUTCMonth(),
-    prevHourDate.getUTCDate(),
-    prevHourDate.getUTCHours(),
-    0,
-    0,
-    0
-  )).toISOString();
+function getNextRoundId(now = new Date()) {
+  const istNow = toIST(now);
+  istNow.setHours(istNow.getHours() + 1, 0, 0, 0); // next hour
+  return fromIST(istNow);
 }
 
+/**
+ * Gets the previous round date in IST (previous hour).
+ */
+function getPreviousRoundId(now = new Date()) {
+  const istNow = toIST(now);
+  istNow.setHours(istNow.getHours() - 1, 0, 0, 0); // previous hour
+  return fromIST(istNow);
+}
+
+/**
+ * Logs UTC and IST time for debugging.
+ */
 function logCombo(label, date) {
-  console.log(`original date ${date}`);
-  const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+  const ist = toIST(date);
   console.log(`[${label}] UTC: ${date.toISOString()}, IST: ${ist.toISOString()}`);
 }
 
-// CRON to close current round and create next round at :55 of every hour
+// CRON to close current round and create next round at :55 IST every hour
 cron.schedule("55 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
@@ -86,7 +76,7 @@ cron.schedule("55 * * * *", async () => {
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
       prevRound = await roundsModel.create({
-        date: new Date(Date.UTC(prevCombo.getUTCFullYear(), prevCombo.getUTCMonth(), prevCombo.getUTCDate())),
+        date: new Date(prevCombo.getFullYear(), prevCombo.getMonth(), prevCombo.getDate()),
         time: prevCombo,
         combo: prevCombo,
         roundId: nextRoundId,
@@ -110,7 +100,7 @@ cron.schedule("55 * * * *", async () => {
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
       await roundsModel.create({
-        date: new Date(Date.UTC(nextCombo.getUTCFullYear(), nextCombo.getUTCMonth(), nextCombo.getUTCDate())),
+        date: new Date(nextCombo.getFullYear(), nextCombo.getMonth(), nextCombo.getDate()),
         time: nextCombo,
         combo: nextCombo,
         roundId: nextRoundId,
@@ -126,7 +116,7 @@ cron.schedule("55 * * * *", async () => {
   }
 });
 
-// CRON to process bets and assign winners at :59 of every hour
+// CRON to process bets and assign winners at :59 IST every hour
 cron.schedule("59 * * * *", async () => {
   console.log(`\n[CRON 59] Triggered at ${new Date().toISOString()}`);
 

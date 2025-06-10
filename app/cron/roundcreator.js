@@ -52,7 +52,7 @@ function logCombo(label, utcDate) {
 }
 
 // CRON to close current round and create next round at :55 IST every hour
-cron.schedule("25 * * * *", async () => {
+cron.schedule("31 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {
@@ -113,7 +113,7 @@ cron.schedule("25 * * * *", async () => {
 });
 
 // CRON to process bets and assign winners at :59 IST every hour
-cron.schedule("29 * * * *", async () => {
+cron.schedule("59 * * * *", async () => {
   console.log(`\n[CRON 59] Triggered at ${new Date().toISOString()}`);
 
   try {

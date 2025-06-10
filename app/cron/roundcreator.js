@@ -5,56 +5,64 @@ const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
 /**
- * Returns a Date object in IST (not UTC), rounded to the hour, with optional hour offset.
- * @param {number} offsetHours
- * @returns {Date} Date object representing IST hour start
+ * Returns a Date object representing the next hour (UTC).
+ * @param {Date} now
+ * @returns {Date}
  */
 function getNextRoundId(now = new Date()) {
-  // Clone the date and adjust the time for IST
   const nextHourDate = new Date(now);
-  nextHourDate.setUTCHours(nextHourDate.getUTCHours());
+  nextHourDate.setUTCHours(nextHourDate.getUTCHours() + 1);
 
-  // Add one hour to the adjusted time
-  nextHourDate.setHours(nextHourDate.getHours() + 1);
-
-  const year = nextHourDate.getFullYear();
-  const month = String(nextHourDate.getMonth() + 1).padStart(2, "0");
-  const day = String(nextHourDate.getDate()).padStart(2, "0");
-  const hour = String(nextHourDate.getHours()).padStart(2, "0");
-
-  return new Date(`${year}-${month}-${day}T${hour}:00:00.000Z`);
+  return new Date(Date.UTC(
+    nextHourDate.getUTCFullYear(),
+    nextHourDate.getUTCMonth(),
+    nextHourDate.getUTCDate(),
+    nextHourDate.getUTCHours(),
+    0,
+    0,
+    0
+  ));
 }
 
+/**
+ * Returns a Date object representing the current hour (UTC).
+ * @param {Date} now
+ * @returns {Date}
+ */
 function getCurrentRoundId(now = new Date()) {
-  // Adjust the time for IST
-  now.setUTCHours(now.getUTCHours());
-
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hour = String(now.getHours()).padStart(2, "0");
-
-  return new Date(`${year}-${month}-${day}T${hour}:00:00.000Z`);
+  return new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    0,
+    0,
+    0
+  ));
 }
 
+/**
+ * Returns a string representing the previous hour (UTC).
+ * @param {Date} now
+ * @returns {string}
+ */
 function getPreviousRoundId(now = new Date()) {
-  // Clone the date and adjust the time for IST
   const prevHourDate = new Date(now);
-  prevHourDate.setUTCHours(prevHourDate.getUTCHours());
+  prevHourDate.setUTCHours(prevHourDate.getUTCHours() - 1);
 
-  // Subtract one hour from the adjusted time
-  prevHourDate.setHours(prevHourDate.getHours() - 1);
-
-  const year = prevHourDate.getFullYear();
-  const month = String(prevHourDate.getMonth() + 1).padStart(2, "0");
-  const day = String(prevHourDate.getDate()).padStart(2, "0");
-  const hour = String(prevHourDate.getHours()).padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
+  return new Date(Date.UTC(
+    prevHourDate.getUTCFullYear(),
+    prevHourDate.getUTCMonth(),
+    prevHourDate.getUTCDate(),
+    prevHourDate.getUTCHours(),
+    0,
+    0,
+    0
+  )).toISOString();
 }
 
 function logCombo(label, date) {
-  console.log(`original date ${date}`)
+  console.log(`original date ${date}`);
   const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
   console.log(`[${label}] UTC: ${date.toISOString()}, IST: ${ist.toISOString()}`);
 }

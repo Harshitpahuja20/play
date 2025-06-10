@@ -1,64 +1,46 @@
 const cron = require("node-cron");
+const { DateTime } = require("luxon");
 const roundsModel = require("../model/rounds.model");
 const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
+const IST_ZONE = "Asia/Kolkata";
+
 /**
- * Converts a UTC date to IST.
- * @param {Date} date
- * @returns {Date} IST date
+ * Gets the current round datetime in IST, rounded to the current hour.
  */
-function toIST(date) {
-  return new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+function getCurrentRoundId() {
+  const nowIST = DateTime.now().setZone(IST_ZONE).startOf("hour");
+  return nowIST.toUTC().toJSDate();
 }
 
 /**
- * Converts IST date to UTC.
- * @param {Date} date
- * @returns {Date}
+ * Gets the next round datetime in IST (next hour), handling day rollover.
  */
-function fromIST(date) {
-  return new Date(date.getTime() - 5.5 * 60 * 60 * 1000);
+function getNextRoundId() {
+  const nextIST = DateTime.now().setZone(IST_ZONE).plus({ hours: 1 }).startOf("hour");
+  return nextIST.toUTC().toJSDate();
 }
 
 /**
- * Gets the current round date in IST (aligned to the current hour).
+ * Gets the previous round datetime in IST (previous hour).
  */
-function getCurrentRoundId(now = new Date()) {
-  const istNow = toIST(now);
-  istNow.setMinutes(0, 0, 0); // round to hour
-  return fromIST(istNow); // store as UTC but based on IST hour
-}
-
-/**
- * Gets the next round date in IST (next hour).
- */
-function getNextRoundId(now = new Date()) {
-  const istNow = toIST(now);
-  istNow.setHours(istNow.getHours() + 1, 0, 0, 0); // next hour
-  return fromIST(istNow);
-}
-
-/**
- * Gets the previous round date in IST (previous hour).
- */
-function getPreviousRoundId(now = new Date()) {
-  const istNow = toIST(now);
-  istNow.setHours(istNow.getHours() - 1, 0, 0, 0); // previous hour
-  return fromIST(istNow);
+function getPreviousRoundId() {
+  const prevIST = DateTime.now().setZone(IST_ZONE).minus({ hours: 1 }).startOf("hour");
+  return prevIST.toUTC().toJSDate();
 }
 
 /**
  * Logs UTC and IST time for debugging.
  */
-function logCombo(label, date) {
-  const ist = toIST(date);
-  console.log(`[${label}] UTC: ${date.toISOString()}, IST: ${ist.toISOString()}`);
+function logCombo(label, utcDate) {
+  const ist = DateTime.fromJSDate(utcDate).setZone(IST_ZONE);
+  console.log(`[${label}] UTC: ${utcDate.toISOString()}, IST: ${ist.toISO()}`);
 }
 
 // CRON to close current round and create next round at :55 IST every hour
-cron.schedule("55 * * * *", async () => {
+cron.schedule("20 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {

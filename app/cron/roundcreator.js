@@ -4,53 +4,55 @@ const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
-// Helpers
+// Constant for IST offset in milliseconds
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 /**
- * Returns a Date object aligned to the current IST hour.
+ * Get UTC Date aligned to the current IST hour.
  */
 function getCurrentRoundId(now = new Date()) {
-  const istTime = new Date(now.getTime() + IST_OFFSET_MS);
-  istTime.setMinutes(0, 0, 0); // Round to start of hour
-  return new Date(istTime.getTime() - IST_OFFSET_MS); // Return as UTC-based Date object
+  const ist = new Date(now.getTime() + IST_OFFSET_MS);
+  ist.setMinutes(0, 0, 0);
+  return new Date(ist.getTime() - IST_OFFSET_MS);
 }
 
 /**
- * Returns a Date object aligned to the next IST hour.
+ * Get UTC Date aligned to the next IST hour.
  */
 function getNextRoundId(now = new Date()) {
-  const istTime = new Date(now.getTime() + IST_OFFSET_MS);
-  istTime.setMinutes(0, 0, 0);
-  istTime.setHours(istTime.getHours() + 1); // Add one hour
-  return new Date(istTime.getTime() - IST_OFFSET_MS);
+  const ist = new Date(now.getTime() + IST_OFFSET_MS);
+  ist.setMinutes(0, 0, 0);
+  ist.setHours(ist.getHours() + 1);
+  return new Date(ist.getTime() - IST_OFFSET_MS);
 }
 
 /**
- * Returns a Date object aligned to the previous IST hour.
+ * Get UTC Date aligned to the previous IST hour.
  */
 function getPreviousRoundId(now = new Date()) {
-  const istTime = new Date(now.getTime() + IST_OFFSET_MS);
-  istTime.setMinutes(0, 0, 0);
-  istTime.setHours(istTime.getHours() - 1);
-  return new Date(istTime.getTime() - IST_OFFSET_MS);
+  const ist = new Date(now.getTime() + IST_OFFSET_MS);
+  ist.setMinutes(0, 0, 0);
+  ist.setHours(ist.getHours() - 1);
+  return new Date(ist.getTime() - IST_OFFSET_MS);
 }
 
 /**
- * Returns ISO string with +05:30 manually appended (for display only).
+ * Convert UTC Date to ISO string in IST for display/logging.
  */
 function getISTISOString(date) {
-  const istDate = new Date(date.getTime() + IST_OFFSET_MS);
-  const iso = istDate.toISOString().replace("Z", "+05:30");
-  return iso;
+  const ist = new Date(date.getTime() + IST_OFFSET_MS);
+  return ist.toISOString().replace("Z", "+05:30");
 }
 
+/**
+ * Log combo UTC and IST view for debug.
+ */
 function logCombo(label, utcDate) {
   console.log(`[${label}] UTC: ${utcDate.toISOString()}, IST: ${getISTISOString(utcDate)}`);
 }
 
 // CRON to close current round and create next round at :55 IST every hour
-cron.schedule("27 * * * *", async () => {
+cron.schedule("25 * * * *", async () => {
   console.log(`\n[CRON 55] Triggered at ${new Date().toISOString()}`);
 
   try {
@@ -67,8 +69,9 @@ cron.schedule("27 * * * *", async () => {
       const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
-      prevRound = await roundsModel.create({
-        date: new Date(prevCombo.getFullYear(), prevCombo.getMonth(), prevCombo.getDate()),
+      const istDate = new Date(prevCombo.getTime() + IST_OFFSET_MS);
+      await roundsModel.create({
+        date: new Date(istDate.getFullYear(), istDate.getMonth(), istDate.getDate()),
         time: prevCombo,
         combo: prevCombo,
         roundId: nextRoundId,
@@ -91,8 +94,9 @@ cron.schedule("27 * * * *", async () => {
       const lastRound = await roundsModel.findOne().sort({ roundId: -1 }).lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
+      const istDate = new Date(nextCombo.getTime() + IST_OFFSET_MS);
       await roundsModel.create({
-        date: new Date(nextCombo.getFullYear(), nextCombo.getMonth(), nextCombo.getDate()),
+        date: new Date(istDate.getFullYear(), istDate.getMonth(), istDate.getDate()),
         time: nextCombo,
         combo: nextCombo,
         roundId: nextRoundId,
@@ -121,7 +125,7 @@ cron.schedule("29 * * * *", async () => {
       return;
     }
 
-    // ===== Assign Winning Card =====
+    // ===== Assign Winning Card (if not already) =====
     if (!round.cardId) {
       const cardBets = await betModel.aggregate([
         { $match: { roundId: round._id } },

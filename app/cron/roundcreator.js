@@ -206,7 +206,7 @@ const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
 // Constant for IST offset in milliseconds
-const IST_OFFSET_MS = 5 * 60 * 60 * 1000;
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 // Helper functions
 function getCurrentRoundId(now = new Date()) {

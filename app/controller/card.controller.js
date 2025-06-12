@@ -6,7 +6,7 @@ const {
 } = require("../middleware/responses"); // update path accordingly
 const crypto = require("crypto");
 const roundsModel = require("../model/rounds.model");
-const { getISTDate, getCurrentRoundId, getPreviousRoundId } = require('../cron/roundcreator');
+const { getISTDate, getISTNow, getCurrentRoundComboIST, getPreviousRoundComboIST, getNextRoundComboIST } = require('../cron/roundcreator');
 
 exports.addCard = async (req, res) => {
   // Call the upload middleware for 'card' field
@@ -41,23 +41,19 @@ exports.addCard = async (req, res) => {
 
 exports.getCards = async (req, res) => {
   try {
-    // Get current and previous round IDs using IST-native functions
-    const currentRoundId = getCurrentRoundId();
-    const previousRoundId = getPreviousRoundId();
-    const istNow = getISTDate();
-    
+    const istNow = getISTNow();
+    const currentRoundId = getCurrentRoundComboIST();
+    const previousRoundId = getPreviousRoundComboIST();
+
     console.log('Current IST Time:', istNow.toISOString());
     console.log('Current Round ID (IST):', currentRoundId.toISOString());
     console.log('Previous Round ID (IST):', previousRoundId.toISOString());
-    
-    // Run independent queries concurrently for better speed
-    const [cards, currentRound, previousRound] = await Promise.all([
+
+    const [cards, currentRound, previousRoundAgg] = await Promise.all([
       Card.find().sort({ createdAt: 1 }),
       roundsModel.findOne({ combo: currentRoundId }),
       roundsModel.aggregate([
-        {
-          $match: { combo: previousRoundId },
-        },
+        { $match: { combo: previousRoundId } },
         {
           $lookup: {
             from: "cards",
@@ -74,46 +70,10 @@ exports.getCards = async (req, res) => {
       return responsestatusmessage(res, false, "No cards found.");
     }
 
-    // Format previousRound data for consistent shape
-    const formattedPreviousRound = previousRound?.length
-      ? {
-          _id: previousRound[0]?._id,
-          roundId: previousRound[0]?.roundId,
-          image: previousRound[0]?.card?.image || null,
-          name: previousRound[0]?.card?.name || null,
-          cardId: previousRound[0]?.cardId || null,
-          combo: previousRound[0]?.combo || null,
-          isClosed: previousRound[0]?.isClosed || false,
-          isProcessed: previousRound[0]?.isProcessed || false,
-          date: previousRound[0]?.date || null,
-          time: previousRound[0]?.time || null,
-          resultDeclaredAt: previousRound[0]?.resultDeclaredAt || null,
-          processedAt: previousRound[0]?.processedAt || null,
-        }
-      : null;
-
-    // Format current round data
-    const formattedCurrentRound = currentRound ? {
-      _id: currentRound._id,
-      roundId: currentRound.roundId,
-      combo: currentRound.combo,
-      date: currentRound.date,
-      time: currentRound.time,
-      isClosed: currentRound.isClosed,
-      isProcessed: currentRound.isProcessed || false,
-      cardId: currentRound.cardId || null,
-      createdAt: currentRound.createdAt,
-      updatedAt: currentRound.updatedAt,
-      // Calculate time remaining until round closes (in seconds)
-      timeRemaining: currentRound.isClosed ? 0 : Math.max(0, Math.floor((currentRound.combo.getTime() + (55 * 60 * 1000) - istNow.getTime()) / 1000)),
-      // Status based on current IST time
-      status: getCurrentRoundStatus(currentRound, istNow)
-    } : null;
-
     return responsestatusdata(res, true, "Cards retrieved successfully", {
       cards,
-      currentRound: formattedCurrentRound,
-      previousRound: formattedPreviousRound,
+      currentRound,
+      previousRound: previousRoundAgg.length > 0 ? previousRoundAgg[0] : null,
       serverTime: {
         ist: istNow.toISOString(),
         timestamp: istNow.getTime()
@@ -121,7 +81,7 @@ exports.getCards = async (req, res) => {
       roundInfo: {
         currentRoundId: currentRoundId.toISOString(),
         previousRoundId: previousRoundId.toISOString(),
-        nextRoundStarts: getNextRoundStartTime(istNow).toISOString()
+        nextRoundStarts: getNextRoundComboIST().toISOString()
       }
     });
   } catch (error) {

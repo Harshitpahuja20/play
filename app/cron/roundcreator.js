@@ -4,88 +4,71 @@ const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
-// Helper functions for IST handling - Everything in IST
-function getISTDate(utcDate = new Date()) {
-  // Create IST date by adding 5.5 hours to UTC
-  const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
-  return istDate;
+// --- Helper Functions ---
+// Get current IST datetime
+function getISTNow() {
+  return new Date(Date.now() + 5.5 * 60 * 60 * 1000);
 }
 
-function getCurrentRoundId(now = new Date()) {
-  const istNow = getISTDate(now);
-  
-  // Set minutes and seconds to 0 to get the current hour boundary in IST
-  const roundTime = new Date(istNow);
-  roundTime.setMinutes(0, 0, 0);
-  
-  // Return IST time directly (no conversion back to UTC)
-  return roundTime;
+// Get start of the current hour in IST
+function getCurrentRoundComboIST() {
+  const now = getISTNow();
+  now.setMinutes(0, 0, 0);
+  return now;
 }
 
-function getNextRoundId(now = new Date()) {
-  const istNow = getISTDate(now);
-  
-  // Set to next hour boundary in IST
-  const nextRoundTime = new Date(istNow);
-  nextRoundTime.setMinutes(0, 0, 0);
-  nextRoundTime.setHours(nextRoundTime.getHours() + 1);
-  
-  // Return IST time directly
-  return nextRoundTime;
+// Get next round combo (next hour boundary in IST)
+function getNextRoundComboIST() {
+  const now = getISTNow();
+  now.setMinutes(0, 0, 0);
+  now.setHours(now.getHours() + 1);
+  return now;
 }
 
-function getPreviousRoundId(now = new Date()) {
-  const istNow = getISTDate(now);
-  
-  // Set to previous hour boundary in IST
-  const prevRoundTime = new Date(istNow);
-  prevRoundTime.setMinutes(0, 0, 0);
-  prevRoundTime.setHours(prevRoundTime.getHours() - 1);
-  
-  // Return IST time directly
-  return prevRoundTime;
+// Get previous hour combo in IST
+function getPreviousRoundComboIST() {
+  const now = getISTNow();
+  now.setMinutes(0, 0, 0);
+  now.setHours(now.getHours() - 1);
+  return now;
 }
 
-function getISTDateOnly(istDate) {
-  // Get date-only (YYYY-MM-DD) in IST
+// Get just date (YYYY-MM-DD in IST)
+function getISTDateOnly(istDate = getISTNow()) {
   return new Date(istDate.getFullYear(), istDate.getMonth(), istDate.getDate());
 }
 
-function logCombo(label, istDate) {
-  console.log(`[${label}] IST: ${istDate.toISOString()}`);
-}
-
-// CRON at :55 IST — Close the current round if needed
+// --- CRON: Close current round at :55 IST ---
 cron.schedule("55 * * * *", async () => {
-  const istNow = getISTDate();
-  console.log(`\n[CRON 55] Triggered at IST: ${istNow.toISOString()}`);
+  const istNow = getISTNow();
+  const combo = getCurrentRoundComboIST();
+  const dateOnly = getISTDateOnly(combo);
+
+  console.log(`\n[CRON 55] Triggered at IST: ${istNow.toString()}`);
 
   try {
-    const combo = getCurrentRoundId();
-    logCombo("Current Round", combo);
-
     let round = await roundsModel.findOne({ combo });
 
     if (!round) {
-      const lastRound = await roundsModel.findOne().sort({ createdAt: -1 }).limit(1).lean();
+      const lastRound = await roundsModel.findOne().sort({ createdAt: -1 }).lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
-      
+
       await roundsModel.create({
-        date: getISTDateOnly(combo),
+        date: dateOnly,
         time: combo,
-        combo,
+        combo: combo,
         roundId: nextRoundId,
         isClosed: true,
-        createdAt: istNow, // Store creation time in IST
-        updatedAt: istNow
+        createdAt: istNow,
+        updatedAt: istNow,
       });
 
-      console.log(`[CRON 55] Round missing — created & closed (roundId: ${nextRoundId}).`);
+      console.log(`[CRON 55] Round missing — created & closed (roundId: ${nextRoundId})`);
     } else if (!round.isClosed) {
       round.isClosed = true;
-      round.updatedAt = istNow; // Update time in IST
+      round.updatedAt = istNow;
       await round.save();
-      console.log("[CRON 55] Closed existing round.");
+      console.log(`[CRON 55] Round closed (roundId: ${round.roundId})`);
     } else {
       console.log("[CRON 55] Round already closed.");
     }
@@ -94,55 +77,54 @@ cron.schedule("55 * * * *", async () => {
   }
 });
 
-// CRON at :00 IST — Create the next round
+// --- CRON: Create next round at :00 IST ---
 cron.schedule("0 * * * *", async () => {
-  const istNow = getISTDate();
-  console.log(`\n[CRON 00] Triggered at IST: ${istNow.toISOString()}`);
+  const istNow = getISTNow();
+  const combo = getNextRoundComboIST();
+  const dateOnly = getISTDateOnly(combo);
+
+  console.log(`\n[CRON 00] Triggered at IST: ${istNow.toString()}`);
 
   try {
-    const combo = getNextRoundId();
-    logCombo("Next Round", combo);
-
     const exists = await roundsModel.findOne({ combo });
-
-    if (!exists) {
-      const lastRound = await roundsModel.findOne().sort({ createdAt: -1 }).limit(1).lean();
-      const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
-
-      await roundsModel.create({
-        date: getISTDateOnly(combo),
-        time: combo,
-        combo,
-        roundId: nextRoundId,
-        isClosed: false,
-        createdAt: istNow, // Store creation time in IST
-        updatedAt: istNow
-      });
-
-      console.log(`[CRON 00] Created next round (roundId: ${nextRoundId}).`);
-    } else {
+    if (exists) {
       console.log("[CRON 00] Next round already exists.");
+      return;
     }
+
+    const lastRound = await roundsModel.findOne().sort({ createdAt: -1 }).lean();
+    const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
+
+    await roundsModel.create({
+      date: dateOnly,
+      time: combo,
+      combo: combo,
+      roundId: nextRoundId,
+      isClosed: false,
+      createdAt: istNow,
+      updatedAt: istNow,
+    });
+
+    console.log(`[CRON 00] Created next round (roundId: ${nextRoundId})`);
   } catch (err) {
     console.error(`[CRON 00] Error: ${err.message}`);
   }
 });
 
-// CRON at :59 IST — Process bets and assign winners
+// --- CRON: Process bets at :59 IST ---
 cron.schedule("59 * * * *", async () => {
-  const istNow = getISTDate();
-  console.log(`\n[CRON 59] Triggered at IST: ${istNow.toISOString()}`);
+  const istNow = getISTNow();
+  const combo = getCurrentRoundComboIST();
+
+  console.log(`\n[CRON 59] Triggered at IST: ${istNow.toString()}`);
 
   try {
-    const combo = getCurrentRoundId();
     const round = await roundsModel.findOne({ combo, isClosed: true });
-
     if (!round) {
       console.log(`[CRON 59] No closed round found for: ${combo.toISOString()}`);
       return;
     }
 
-    // Assign winning card if not already set
     if (!round.cardId) {
       const cardBets = await betModel.aggregate([
         { $match: { roundId: round._id } },
@@ -155,17 +137,17 @@ cron.schedule("59 * * * *", async () => {
         round.cardId = cardBets[0]._id;
       } else {
         const [randomCard] = await cardModel.aggregate([{ $sample: { size: 1 } }]);
-        if (!randomCard) throw new Error("No card available for assignment.");
+        if (!randomCard) throw new Error("No card available.");
         round.cardId = randomCard._id;
       }
 
-      round.resultDeclaredAt = istNow; // Store result declaration time in IST
+      round.resultDeclaredAt = istNow;
       round.updatedAt = istNow;
       await round.save();
-      console.log(`[CRON 59] Assigned cardId ${round.cardId} to round.`);
+      console.log(`[CRON 59] Assigned winning cardId ${round.cardId}`);
     }
 
-    // Process bets
+    // Process all bets
     const bets = await betModel.find({ roundId: round._id });
     const bulkUserOps = [];
     const bulkBetOps = [];
@@ -178,13 +160,13 @@ cron.schedule("59 * * * *", async () => {
       bulkBetOps.push({
         updateOne: {
           filter: { _id: bet._id },
-          update: { 
-            $set: { 
-              status: isWin ? "win" : "loss", 
+          update: {
+            $set: {
+              status: isWin ? "win" : "loss",
               resultAmount,
-              processedAt: istNow, // Store processing time in IST
-              updatedAt: istNow
-            } 
+              processedAt: istNow,
+              updatedAt: istNow,
+            },
           },
         },
       });
@@ -193,9 +175,9 @@ cron.schedule("59 * * * *", async () => {
         bulkUserOps.push({
           updateOne: {
             filter: { _id: bet.userId },
-            update: { 
+            update: {
               $inc: { balance: userCredit },
-              $set: { updatedAt: istNow } // Update user record time in IST
+              $set: { updatedAt: istNow },
             },
           },
         });
@@ -204,60 +186,54 @@ cron.schedule("59 * * * *", async () => {
 
     if (bulkUserOps.length) {
       await User.bulkWrite(bulkUserOps);
-      console.log(`[CRON 59] Updated balances for ${bulkUserOps.length} users.`);
+      console.log(`[CRON 59] Credited ${bulkUserOps.length} user(s)`);
     }
 
     if (bulkBetOps.length) {
       await betModel.bulkWrite(bulkBetOps);
-      console.log(`[CRON 59] Updated bet statuses for ${bulkBetOps.length} bets.`);
+      console.log(`[CRON 59] Updated ${bulkBetOps.length} bet(s)`);
     }
 
-    // Mark round as processed
     round.isProcessed = true;
     round.processedAt = istNow;
     round.updatedAt = istNow;
     await round.save();
 
-    console.log(`[CRON 59] Processing complete for round: ${combo.toISOString()}`);
+    console.log(`[CRON 59] Round processed: ${combo.toISOString()}`);
   } catch (err) {
     console.error(`[CRON 59] Error: ${err.message}`);
   }
 });
 
-// Optional: Add a health check cron to monitor the system
+// --- CRON: Health check every 15 minutes ---
 cron.schedule("*/15 * * * *", async () => {
   try {
-    const istNow = getISTDate();
-    console.log(`[HEALTH CHECK] System running - IST: ${istNow.toISOString()}`);
-    
-    // Check if there's an active round
+    const istNow = getISTNow();
+    console.log(`[HEALTH CHECK] Running - IST: ${istNow.toString()}`);
+
     const activeRound = await roundsModel.findOne({ isClosed: false }).sort({ createdAt: -1 });
     if (activeRound) {
-      console.log(`[HEALTH CHECK] Active round found: ${activeRound.roundId}, Combo: ${activeRound.combo.toISOString()}`);
+      console.log(`[HEALTH CHECK] Active round: ${activeRound.roundId}, Combo: ${activeRound.combo.toISOString()}`);
     } else {
-      console.log(`[HEALTH CHECK] No active round found`);
+      console.log("[HEALTH CHECK] No active round.");
     }
 
-    // Check for any rounds that should be closed but aren't
-    const istCurrentHour = getCurrentRoundId();
-    const shouldBeClosedRound = await roundsModel.findOne({ 
-      combo: { $lt: istCurrentHour }, 
-      isClosed: false 
-    });
-    
-    if (shouldBeClosedRound) {
-      console.log(`[HEALTH CHECK] WARNING: Found unclosed round that should be closed: ${shouldBeClosedRound.roundId}`);
+    const currentCombo = getCurrentRoundComboIST();
+    const shouldBeClosed = await roundsModel.findOne({ combo: { $lt: currentCombo }, isClosed: false });
+
+    if (shouldBeClosed) {
+      console.log(`[HEALTH CHECK] WARNING: Unclosed round found: ${shouldBeClosed.roundId}`);
     }
   } catch (err) {
     console.error(`[HEALTH CHECK] Error: ${err.message}`);
   }
 });
 
-// Export helper functions for use in other files
+// Exported helpers
 module.exports = {
-  getISTDate,
-  getCurrentRoundId,
-  getNextRoundId,
-  getPreviousRoundId,
-  getISTDateOnly
+  getISTNow,
+  getCurrentRoundComboIST,
+  getNextRoundComboIST,
+  getPreviousRoundComboIST,
+  getISTDateOnly,
 };

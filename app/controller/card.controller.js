@@ -6,6 +6,7 @@ const {
 } = require("../middleware/responses"); // update path accordingly
 const crypto = require("crypto");
 const roundsModel = require("../model/rounds.model");
+const { getISTDate, getCurrentRoundId, getPreviousRoundId } = require('../cron/roundcreator');
 
 exports.addCard = async (req, res) => {
   // Call the upload middleware for 'card' field
@@ -40,13 +41,14 @@ exports.addCard = async (req, res) => {
 
 exports.getCards = async (req, res) => {
   try {
-    // Get current and previous round IDs using the corrected functions
+    // Get current and previous round IDs using IST-native functions
     const currentRoundId = getCurrentRoundId();
     const previousRoundId = getPreviousRoundId();
+    const istNow = getISTDate();
     
-    console.log('Current Round ID:', currentRoundId.toISOString());
-    console.log('Previous Round ID:', previousRoundId.toISOString());
-    console.log('Current IST Time:', getISTDate().toISOString());
+    console.log('Current IST Time:', istNow.toISOString());
+    console.log('Current Round ID (IST):', currentRoundId.toISOString());
+    console.log('Previous Round ID (IST):', previousRoundId.toISOString());
     
     // Run independent queries concurrently for better speed
     const [cards, currentRound, previousRound] = await Promise.all([
@@ -82,23 +84,44 @@ exports.getCards = async (req, res) => {
           cardId: previousRound[0]?.cardId || null,
           combo: previousRound[0]?.combo || null,
           isClosed: previousRound[0]?.isClosed || false,
+          isProcessed: previousRound[0]?.isProcessed || false,
+          date: previousRound[0]?.date || null,
+          time: previousRound[0]?.time || null,
+          resultDeclaredAt: previousRound[0]?.resultDeclaredAt || null,
+          processedAt: previousRound[0]?.processedAt || null,
         }
       : null;
 
-    // Add some debug info for current round
+    // Format current round data
     const formattedCurrentRound = currentRound ? {
-      ...currentRound.toObject(),
-      istTime: getISTDate(currentRound.combo).toISOString(),
+      _id: currentRound._id,
+      roundId: currentRound.roundId,
+      combo: currentRound.combo,
+      date: currentRound.date,
+      time: currentRound.time,
+      isClosed: currentRound.isClosed,
+      isProcessed: currentRound.isProcessed || false,
+      cardId: currentRound.cardId || null,
+      createdAt: currentRound.createdAt,
+      updatedAt: currentRound.updatedAt,
+      // Calculate time remaining until round closes (in seconds)
+      timeRemaining: currentRound.isClosed ? 0 : Math.max(0, Math.floor((currentRound.combo.getTime() + (55 * 60 * 1000) - istNow.getTime()) / 1000)),
+      // Status based on current IST time
+      status: getCurrentRoundStatus(currentRound, istNow)
     } : null;
 
     return responsestatusdata(res, true, "Cards retrieved successfully", {
       cards,
       currentRound: formattedCurrentRound,
       previousRound: formattedPreviousRound,
-      debug: {
+      serverTime: {
+        ist: istNow.toISOString(),
+        timestamp: istNow.getTime()
+      },
+      roundInfo: {
         currentRoundId: currentRoundId.toISOString(),
         previousRoundId: previousRoundId.toISOString(),
-        currentISTTime: getISTDate().toISOString(),
+        nextRoundStarts: getNextRoundStartTime(istNow).toISOString()
       }
     });
   } catch (error) {
@@ -123,6 +146,67 @@ exports.getAdminCards = async (req, res) => {
   }
 };
 
+function getCurrentRoundStatus(round, istNow) {
+  if (!round) return 'not_found';
+  
+  const roundTime = new Date(round.combo);
+  const closeTime = new Date(roundTime.getTime() + (55 * 60 * 1000)); // +55 minutes
+  const processTime = new Date(roundTime.getTime() + (59 * 60 * 1000)); // +59 minutes
+  
+  if (istNow < closeTime) {
+    return 'betting_open';
+  } else if (istNow >= closeTime && istNow < processTime) {
+    return 'betting_closed';
+  } else if (istNow >= processTime && !round.isProcessed) {
+    return 'processing';
+  } else if (round.isProcessed) {
+    return 'completed';
+  }
+  
+  return 'unknown';
+}
+
+// Helper function to get next round start time
+function getNextRoundStartTime(istNow) {
+  const nextHour = new Date(istNow);
+  nextHour.setMinutes(0, 0, 0);
+  nextHour.setHours(nextHour.getHours() + 1);
+  return nextHour;
+}
+
+// Alternative function for getting rounds by date range (IST)
+exports.getRoundsByDateRange = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const istNow = getISTDate();
+    
+    // Parse dates as IST
+    const start = startDate ? new Date(startDate) : new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate());
+    const end = endDate ? new Date(endDate) : new Date(start.getTime() + (24 * 60 * 60 * 1000));
+    
+    console.log('Date range query (IST):', start.toISOString(), 'to', end.toISOString());
+    
+    const rounds = await roundsModel.find({
+      date: {
+        $gte: start,
+        $lt: end
+      }
+    }).populate('cardId').sort({ combo: -1 });
+    
+    return responsestatusdata(res, true, "Rounds retrieved successfully", {
+      rounds,
+      dateRange: {
+        start: start.toISOString(),
+        end: end.toISOString()
+      },
+      serverTime: istNow.toISOString()
+    });
+  } catch (error) {
+    console.error('Error in getRoundsByDateRange:', error);
+    return responsestatusmessage(res, false, "Something went wrong.");
+  }
+};
+
 function generateImageName(originalName) {
   const dateStr = new Date().toISOString().replace(/[-:TZ.]/g, ""); // e.g., 20250503124700
   const randomStr = crypto.randomBytes(3).toString("hex"); // 6 characters
@@ -130,51 +214,29 @@ function generateImageName(originalName) {
   return `img${dateStr}${randomStr}${extension}`;
 }
 
-function getISTDate(utcDate = new Date()) {
-  // Create IST date by adding 5.5 hours to UTC
-  const istDate = new Date(utcDate.getTime() + 5.5 * 60 * 60 * 1000);
-  return istDate;
-}
+// function getCurrentRoundId(now = new Date()) {
+//   const istNow = getISTDate(now);
 
-function getCurrentRoundId(now = new Date()) {
-  const istNow = getISTDate(now);
+//   // Set minutes and seconds to 0 to get the current hour boundary
+//   const roundTime = new Date(istNow);
+//   roundTime.setMinutes(0, 0, 0);
 
-  // Set minutes and seconds to 0 to get the current hour boundary
-  const roundTime = new Date(istNow);
-  roundTime.setMinutes(0, 0, 0);
+//   // Convert back to UTC for storage
+//   const utcRoundTime = new Date(roundTime.getTime() - 5.5 * 60 * 60 * 1000);
+//   return utcRoundTime;
+// }
 
-  // Convert back to UTC for storage
-  const utcRoundTime = new Date(roundTime.getTime() - 5.5 * 60 * 60 * 1000);
-  return utcRoundTime;
-}
+// function getPreviousRoundId(now = new Date()) {
+//   const istNow = getISTDate(now);
 
-function getPreviousRoundId(now = new Date()) {
-  const istNow = getISTDate(now);
+//   // Set to previous hour boundary
+//   const prevRoundTime = new Date(istNow);
+//   prevRoundTime.setMinutes(0, 0, 0);
+//   prevRoundTime.setHours(prevRoundTime.getHours() - 1);
 
-  // Set to previous hour boundary
-  const prevRoundTime = new Date(istNow);
-  prevRoundTime.setMinutes(0, 0, 0);
-  prevRoundTime.setHours(prevRoundTime.getHours() - 1);
-
-  // Convert back to UTC for storage
-  const utcPrevRoundTime = new Date(
-    prevRoundTime.getTime() - 5.5 * 60 * 60 * 1000
-  );
-  return utcPrevRoundTime;
-}
-
-function getNextRoundId(now = new Date()) {
-  // Clone the date and adjust the time for IST
-  const nextHourDate = new Date(now);
-  nextHourDate.setUTCHours(nextHourDate.getUTCHours());
-
-  // Add one hour to the adjusted time
-  nextHourDate.setHours(nextHourDate.getHours() + 1);
-
-  const year = nextHourDate.getFullYear();
-  const month = String(nextHourDate.getMonth() + 1).padStart(2, "0");
-  const day = String(nextHourDate.getDate()).padStart(2, "0");
-  const hour = String(nextHourDate.getHours()).padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
-}
+//   // Convert back to UTC for storage
+//   const utcPrevRoundTime = new Date(
+//     prevRoundTime.getTime() - 5.5 * 60 * 60 * 1000
+//   );
+//   return utcPrevRoundTime;
+// }

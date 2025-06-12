@@ -40,13 +40,15 @@ exports.addCard = async (req, res) => {
 
 exports.getCards = async (req, res) => {
   try {
+    // Get current and previous round IDs using the corrected functions
+    const currentRoundId = getCurrentRoundId();
+    const previousRoundId = getPreviousRoundId();
+    
+    console.log('Current Round ID:', currentRoundId.toISOString());
+    console.log('Previous Round ID:', previousRoundId.toISOString());
+    console.log('Current IST Time:', getISTDate().toISOString());
+    
     // Run independent queries concurrently for better speed
-    const currentRoundId = new Date(getCurrentRoundId());
-    const previousRoundId = new Date(getPreviousRoundId());
-
-    console.log(currentRoundId);
-    console.log(previousRoundId);
-
     const [cards, currentRound, previousRound] = await Promise.all([
       Card.find().sort({ createdAt: 1 }),
       roundsModel.findOne({ combo: currentRoundId }),
@@ -65,28 +67,42 @@ exports.getCards = async (req, res) => {
         { $unwind: { path: "$card", preserveNullAndEmptyArrays: true } },
       ]),
     ]);
+
     if (!cards || cards.length === 0) {
       return responsestatusmessage(res, false, "No cards found.");
     }
 
-    // Format previousRound data for consistent shape (optional)
+    // Format previousRound data for consistent shape
     const formattedPreviousRound = previousRound?.length
       ? {
           _id: previousRound[0]?._id,
+          roundId: previousRound[0]?.roundId,
           image: previousRound[0]?.card?.image || null,
           name: previousRound[0]?.card?.name || null,
+          cardId: previousRound[0]?.cardId || null,
+          combo: previousRound[0]?.combo || null,
+          isClosed: previousRound[0]?.isClosed || false,
         }
       : null;
 
-
+    // Add some debug info for current round
+    const formattedCurrentRound = currentRound ? {
+      ...currentRound.toObject(),
+      istTime: getISTDate(currentRound.combo).toISOString(),
+    } : null;
 
     return responsestatusdata(res, true, "Cards retrieved successfully", {
       cards,
-      currentRound,
+      currentRound: formattedCurrentRound,
       previousRound: formattedPreviousRound,
+      debug: {
+        currentRoundId: currentRoundId.toISOString(),
+        previousRoundId: previousRoundId.toISOString(),
+        currentISTTime: getISTDate().toISOString(),
+      }
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error in getCards:', error);
     return responsestatusmessage(res, false, "Something went wrong.");
   }
 };
@@ -114,33 +130,38 @@ function generateImageName(originalName) {
   return `img${dateStr}${randomStr}${extension}`;
 }
 
-function getCurrentRoundId(now = new Date()) {
-  // Adjust the time for IST
-  now.setUTCHours(now.getUTCHours());
-
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hour = String(now.getHours()).padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hour}:30:00.000Z`;
+function getISTDate(utcDate = new Date()) {
+  // Create IST date by adding 5.5 hours to UTC
+  const istDate = new Date(utcDate.getTime() + 5.5 * 60 * 60 * 1000);
+  return istDate;
 }
 
-  function getPreviousRoundId(now = new Date()) {
-    // Clone the date and adjust the time for IST
-    const prevHourDate = new Date(now);
-    prevHourDate.setUTCHours(prevHourDate.getUTCHours());
+function getCurrentRoundId(now = new Date()) {
+  const istNow = getISTDate(now);
 
-    // Subtract one hour from the adjusted time
-    prevHourDate.setHours(prevHourDate.getHours() - 1);
+  // Set minutes and seconds to 0 to get the current hour boundary
+  const roundTime = new Date(istNow);
+  roundTime.setMinutes(0, 0, 0);
 
-    const year = prevHourDate.getFullYear();
-    const month = String(prevHourDate.getMonth() + 1).padStart(2, "0");
-    const day = String(prevHourDate.getDate()).padStart(2, "0");
-    const hour = String(prevHourDate.getHours()).padStart(2, "0");
+  // Convert back to UTC for storage
+  const utcRoundTime = new Date(roundTime.getTime() - 5.5 * 60 * 60 * 1000);
+  return utcRoundTime;
+}
 
-    return `${year}-${month}-${day}T${hour}:30:00.000Z`;
-  }
+function getPreviousRoundId(now = new Date()) {
+  const istNow = getISTDate(now);
+
+  // Set to previous hour boundary
+  const prevRoundTime = new Date(istNow);
+  prevRoundTime.setMinutes(0, 0, 0);
+  prevRoundTime.setHours(prevRoundTime.getHours() - 1);
+
+  // Convert back to UTC for storage
+  const utcPrevRoundTime = new Date(
+    prevRoundTime.getTime() - 5.5 * 60 * 60 * 1000
+  );
+  return utcPrevRoundTime;
+}
 
 function getNextRoundId(now = new Date()) {
   // Clone the date and adjust the time for IST

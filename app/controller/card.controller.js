@@ -4,7 +4,7 @@ const {
   responsestatusmessage,
   responsestatusdata,
 } = require("../middleware/responses"); // update path accordingly
-const moment = require("moment");
+const moment = require("moment-timezone"); 
 const crypto = require("crypto");
 const roundsModel = require("../model/rounds.model");
 const {
@@ -54,13 +54,13 @@ exports.getCards = async (req, res) => {
     const previousRoundId = getPreviousRoundComboUTC();
     const nextRoundId = getNextRoundComboUTC();
 
-    // Convert them to IST just for display
+    // Convert to IST (for user-facing display only)
     const nowIST = moment.utc(nowUTC).tz("Asia/Kolkata");
     const currentRoundIST = moment.utc(currentRoundId).tz("Asia/Kolkata");
     const previousRoundIST = moment.utc(previousRoundId).tz("Asia/Kolkata");
     const nextRoundIST = moment.utc(nextRoundId).tz("Asia/Kolkata");
 
-    // Fetch data
+    // Fetch round and card data
     const [cards, currentRound, previousRoundAgg] = await Promise.all([
       Card.find().sort({ createdAt: 1 }),
       roundsModel.findOne({ combo: currentRoundId }),
@@ -88,7 +88,7 @@ exports.getCards = async (req, res) => {
       previousRound: previousRoundAgg.length > 0 ? previousRoundAgg[0] : null,
       serverTime: {
         utc: nowUTC.toISOString(),
-        ist: nowIST.format(), // "2025-06-13T13:30:00+05:30"
+        ist: nowIST.format(), // e.g., "2025-06-13T13:30:00+05:30"
         timestamp: nowUTC.getTime(),
       },
       roundInfo: {
@@ -104,7 +104,6 @@ exports.getCards = async (req, res) => {
     return responsestatusmessage(res, false, "Something went wrong.");
   }
 };
-
 
 exports.getAdminCards = async (req, res) => {
   try {

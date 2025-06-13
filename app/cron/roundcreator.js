@@ -7,21 +7,28 @@ const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
-// --- Helper Functions (UTC) ---
+// --- Helper Functions (IST-aligned logic) ---
 function getUTCNow() {
   return moment.utc().toDate();
 }
 
+// NEW: Align round to IST hour, then convert to UTC for storage
 function getCurrentRoundComboUTC() {
-  return moment.utc().startOf("hour").toDate();
+  const istNow = moment.tz(getUTCNow(), "Asia/Kolkata");
+  const flooredIST = istNow.clone().startOf("hour");
+  return flooredIST.tz("UTC").toDate(); // returns UTC timestamp of that IST hour
 }
 
 function getNextRoundComboUTC() {
-  return moment.utc().startOf("hour").add(1, "hour").toDate();
+  const istNow = moment.tz(getUTCNow(), "Asia/Kolkata");
+  const nextIST = istNow.clone().startOf("hour").add(1, "hour");
+  return nextIST.tz("UTC").toDate();
 }
 
 function getPreviousRoundComboUTC() {
-  return moment.utc().startOf("hour").subtract(1, "hour").toDate();
+  const istNow = moment.tz(getUTCNow(), "Asia/Kolkata");
+  const prevIST = istNow.clone().startOf("hour").subtract(1, "hour");
+  return prevIST.tz("UTC").toDate();
 }
 
 function getUTCDateOnly(date = getUTCNow()) {

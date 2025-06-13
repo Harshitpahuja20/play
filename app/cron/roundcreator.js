@@ -33,7 +33,8 @@ function getISTDateOnly(date = getISTNow()) {
 }
 
 function logToFile(msg) {
-  fs.appendFileSync("/var/log/myapp_cron.log", `[${new Date().toISOString()}] ${msg}\n`);
+  console.log(msg)
+  // fs.appendFileSync("/var/log/myapp_cron.log", `[${new Date().toISOString()}] ${msg}\n`);
 }
 
 // --- CRON: Close current round at :55 IST ---

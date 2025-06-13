@@ -1,49 +1,46 @@
 const cron = require("node-cron");
 const fs = require("fs");
-const moment = require("moment-timezone");
+const moment = require("moment");
 
 const roundsModel = require("../model/rounds.model");
 const betModel = require("../model/bet.model");
 const User = require("../model/user.model");
 const cardModel = require("../model/card.model");
 
-// --- Helper Functions ---
-function getISTNow() {
-  return moment().tz("Asia/Kolkata").toDate();
+// --- Helper Functions (UTC) ---
+function getUTCNow() {
+  return moment.utc().toDate();
 }
 
-function getCurrentRoundComboIST() {
-  const now = moment().tz("Asia/Kolkata").startOf("hour");
-  return now.toDate();
+function getCurrentRoundComboUTC() {
+  return moment.utc().startOf("hour").toDate();
 }
 
-function getNextRoundComboIST() {
-  const now = moment().tz("Asia/Kolkata").startOf("hour").add(1, "hour");
-  return now.toDate();
+function getNextRoundComboUTC() {
+  return moment.utc().startOf("hour").add(1, "hour").toDate();
 }
 
-function getPreviousRoundComboIST() {
-  const now = moment().tz("Asia/Kolkata").startOf("hour").subtract(1, "hour");
-  return now.toDate();
+function getPreviousRoundComboUTC() {
+  return moment.utc().startOf("hour").subtract(1, "hour").toDate();
 }
 
-function getISTDateOnly(date = getISTNow()) {
-  const d = moment(date).tz("Asia/Kolkata").startOf("day");
-  return d.toDate();
+function getUTCDateOnly(date = getUTCNow()) {
+  return moment.utc(date).startOf("day").toDate();
 }
 
 function logToFile(msg) {
-  console.log(msg)
-  // fs.appendFileSync("/var/log/myapp_cron.log", `[${new Date().toISOString()}] ${msg}\n`);
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${msg}`);
+  // fs.appendFileSync("/var/log/myapp_cron.log", `[${timestamp}] ${msg}\n`);
 }
 
-// --- CRON: Close current round at :55 IST ---
+// --- CRON: Close current round at :55 UTC ---
 cron.schedule("55 * * * *", async () => {
-  const istNow = getISTNow();
-  const combo = getCurrentRoundComboIST();
-  const dateOnly = getISTDateOnly(combo);
+  const now = getUTCNow();
+  const combo = getCurrentRoundComboUTC();
+  const dateOnly = getUTCDateOnly(combo);
 
-  logToFile(`[CRON 55] Triggered at IST: ${istNow}`);
+  logToFile(`[CRON 55] Triggered at UTC: ${now.toISOString()}`);
 
   try {
     let round = await roundsModel.findOne({ combo });
@@ -55,17 +52,17 @@ cron.schedule("55 * * * *", async () => {
       await roundsModel.create({
         date: dateOnly,
         time: combo,
-        combo: combo,
+        combo,
         roundId: nextRoundId,
         isClosed: true,
-        createdAt: istNow,
-        updatedAt: istNow,
+        createdAt: now,
+        updatedAt: now,
       });
 
       logToFile(`[CRON 55] Round missing — created & closed (roundId: ${nextRoundId})`);
     } else if (!round.isClosed) {
       round.isClosed = true;
-      round.updatedAt = istNow;
+      round.updatedAt = now;
       await round.save();
       logToFile(`[CRON 55] Round closed (roundId: ${round.roundId})`);
     } else {
@@ -76,13 +73,13 @@ cron.schedule("55 * * * *", async () => {
   }
 });
 
-// --- CRON: Create next round at :00 IST ---
+// --- CRON: Create next round at :00 UTC ---
 cron.schedule("0 * * * *", async () => {
-  const istNow = getISTNow();
-  const combo = getNextRoundComboIST();
-  const dateOnly = getISTDateOnly(combo);
+  const now = getUTCNow();
+  const combo = getNextRoundComboUTC();
+  const dateOnly = getUTCDateOnly(combo);
 
-  logToFile(`[CRON 00] Triggered at IST: ${istNow}`);
+  logToFile(`[CRON 00] Triggered at UTC: ${now.toISOString()}`);
 
   try {
     const exists = await roundsModel.findOne({ combo });
@@ -97,11 +94,11 @@ cron.schedule("0 * * * *", async () => {
     await roundsModel.create({
       date: dateOnly,
       time: combo,
-      combo: combo,
+      combo,
       roundId: nextRoundId,
       isClosed: false,
-      createdAt: istNow,
-      updatedAt: istNow,
+      createdAt: now,
+      updatedAt: now,
     });
 
     logToFile(`[CRON 00] Created next round (roundId: ${nextRoundId})`);
@@ -110,12 +107,12 @@ cron.schedule("0 * * * *", async () => {
   }
 });
 
-// --- CRON: Process bets at :59 IST ---
+// --- CRON: Process bets at :59 UTC ---
 cron.schedule("59 * * * *", async () => {
-  const istNow = getISTNow();
-  const combo = getCurrentRoundComboIST();
+  const now = getUTCNow();
+  const combo = getCurrentRoundComboUTC();
 
-  logToFile(`[CRON 59] Triggered at IST: ${istNow}`);
+  logToFile(`[CRON 59] Triggered at UTC: ${now.toISOString()}`);
 
   try {
     const round = await roundsModel.findOne({ combo, isClosed: true });
@@ -140,8 +137,8 @@ cron.schedule("59 * * * *", async () => {
         round.cardId = randomCard._id;
       }
 
-      round.resultDeclaredAt = istNow;
-      round.updatedAt = istNow;
+      round.resultDeclaredAt = now;
+      round.updatedAt = now;
       await round.save();
       logToFile(`[CRON 59] Assigned winning cardId ${round.cardId}`);
     }
@@ -162,8 +159,8 @@ cron.schedule("59 * * * *", async () => {
             $set: {
               status: isWin ? "win" : "loss",
               resultAmount,
-              processedAt: istNow,
-              updatedAt: istNow,
+              processedAt: now,
+              updatedAt: now,
             },
           },
         },
@@ -175,7 +172,7 @@ cron.schedule("59 * * * *", async () => {
             filter: { _id: bet.userId },
             update: {
               $inc: { balance: userCredit },
-              $set: { updatedAt: istNow },
+              $set: { updatedAt: now },
             },
           },
         });
@@ -193,8 +190,8 @@ cron.schedule("59 * * * *", async () => {
     }
 
     round.isProcessed = true;
-    round.processedAt = istNow;
-    round.updatedAt = istNow;
+    round.processedAt = now;
+    round.updatedAt = now;
     await round.save();
 
     logToFile(`[CRON 59] Round processed: ${combo.toISOString()}`);
@@ -203,11 +200,11 @@ cron.schedule("59 * * * *", async () => {
   }
 });
 
-// --- CRON: Health check every 15 minutes ---
+// --- CRON: Health check every 15 minutes (UTC) ---
 cron.schedule("*/15 * * * *", async () => {
   try {
-    const istNow = getISTNow();
-    logToFile(`[HEALTH CHECK] Running - IST: ${istNow}`);
+    const now = getUTCNow();
+    logToFile(`[HEALTH CHECK] Running - UTC: ${now.toISOString()}`);
 
     const activeRound = await roundsModel.findOne({ isClosed: false }).sort({ createdAt: -1 });
     if (activeRound) {
@@ -216,7 +213,7 @@ cron.schedule("*/15 * * * *", async () => {
       logToFile(`[HEALTH CHECK] No active round.`);
     }
 
-    const currentCombo = getCurrentRoundComboIST();
+    const currentCombo = getCurrentRoundComboUTC();
     const shouldBeClosed = await roundsModel.findOne({ combo: { $lt: currentCombo }, isClosed: false });
 
     if (shouldBeClosed) {
@@ -229,9 +226,9 @@ cron.schedule("*/15 * * * *", async () => {
 
 // Exported helpers
 module.exports = {
-  getISTNow,
-  getCurrentRoundComboIST,
-  getNextRoundComboIST,
-  getPreviousRoundComboIST,
-  getISTDateOnly,
+  getUTCNow,
+  getCurrentRoundComboUTC,
+  getNextRoundComboUTC,
+  getPreviousRoundComboUTC,
+  getUTCDateOnly,
 };

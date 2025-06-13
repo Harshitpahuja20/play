@@ -224,7 +224,7 @@ cron.schedule("*/15 * * * *", async () => {
   }
 });
 
-// Exported helpers
+// Export UTC-based helper functions
 module.exports = {
   getUTCNow,
   getCurrentRoundComboUTC,

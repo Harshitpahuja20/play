@@ -47,15 +47,19 @@ exports.addCard = async (req, res) => {
 
 exports.getCards = async (req, res) => {
   try {
+    // Get UTC-based timestamps
     const nowUTC = getUTCNow();
     const currentRoundId = getCurrentRoundComboUTC();
     const previousRoundId = getPreviousRoundComboUTC();
     const nextRoundId = getNextRoundComboUTC();
 
-    console.log('Current UTC Time:', nowUTC.toISOString());
-    console.log('Current Round ID (UTC):', currentRoundId.toISOString());
-    console.log('Previous Round ID (UTC):', previousRoundId.toISOString());
+    // Convert them to IST just for display
+    const nowIST = moment.utc(nowUTC).tz("Asia/Kolkata");
+    const currentRoundIST = moment.utc(currentRoundId).tz("Asia/Kolkata");
+    const previousRoundIST = moment.utc(previousRoundId).tz("Asia/Kolkata");
+    const nextRoundIST = moment.utc(nextRoundId).tz("Asia/Kolkata");
 
+    // Fetch data
     const [cards, currentRound, previousRoundAgg] = await Promise.all([
       Card.find().sort({ createdAt: 1 }),
       roundsModel.findOne({ combo: currentRoundId }),
@@ -83,12 +87,15 @@ exports.getCards = async (req, res) => {
       previousRound: previousRoundAgg.length > 0 ? previousRoundAgg[0] : null,
       serverTime: {
         utc: nowUTC.toISOString(),
+        ist: nowIST.format(), // "2025-06-13T13:30:00+05:30"
         timestamp: nowUTC.getTime(),
       },
       roundInfo: {
-        currentRoundId: currentRoundId.toISOString(),
-        previousRoundId: previousRoundId.toISOString(),
-        nextRoundStarts: nextRoundId.toISOString(),
+        currentRoundIdUTC: currentRoundId.toISOString(),
+        currentRoundIdIST: currentRoundIST.format(),
+        previousRoundIdUTC: previousRoundId.toISOString(),
+        previousRoundIdIST: previousRoundIST.format(),
+        nextRoundStartsIST: nextRoundIST.format(),
       },
     });
   } catch (error) {
@@ -96,6 +103,7 @@ exports.getCards = async (req, res) => {
     return responsestatusmessage(res, false, "Something went wrong.");
   }
 };
+
 
 exports.getAdminCards = async (req, res) => {
   try {

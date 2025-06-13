@@ -6,7 +6,13 @@ const {
 } = require("../middleware/responses"); // update path accordingly
 const crypto = require("crypto");
 const roundsModel = require("../model/rounds.model");
-const { getISTDate, getISTNow, getCurrentRoundComboIST, getPreviousRoundComboIST, getNextRoundComboIST } = require('../cron/roundcreator');
+const {
+  getUTCNow,
+  getCurrentRoundComboUTC,
+  getPreviousRoundComboUTC,
+  getNextRoundComboUTC,
+} = require('../cron/roundcreator');
+
 
 exports.addCard = async (req, res) => {
   // Call the upload middleware for 'card' field
@@ -41,13 +47,14 @@ exports.addCard = async (req, res) => {
 
 exports.getCards = async (req, res) => {
   try {
-    const istNow = getISTNow();
-    const currentRoundId = getCurrentRoundComboIST();
-    const previousRoundId = getPreviousRoundComboIST();
+    const nowUTC = getUTCNow();
+    const currentRoundId = getCurrentRoundComboUTC();
+    const previousRoundId = getPreviousRoundComboUTC();
+    const nextRoundId = getNextRoundComboUTC();
 
-    console.log('Current IST Time:', istNow.toISOString());
-    console.log('Current Round ID (IST):', currentRoundId.toISOString());
-    console.log('Previous Round ID (IST):', previousRoundId.toISOString());
+    console.log('Current UTC Time:', nowUTC.toISOString());
+    console.log('Current Round ID (UTC):', currentRoundId.toISOString());
+    console.log('Previous Round ID (UTC):', previousRoundId.toISOString());
 
     const [cards, currentRound, previousRoundAgg] = await Promise.all([
       Card.find().sort({ createdAt: 1 }),
@@ -75,14 +82,14 @@ exports.getCards = async (req, res) => {
       currentRound,
       previousRound: previousRoundAgg.length > 0 ? previousRoundAgg[0] : null,
       serverTime: {
-        ist: istNow.toISOString(),
-        timestamp: istNow.getTime()
+        utc: nowUTC.toISOString(),
+        timestamp: nowUTC.getTime(),
       },
       roundInfo: {
         currentRoundId: currentRoundId.toISOString(),
         previousRoundId: previousRoundId.toISOString(),
-        nextRoundStarts: getNextRoundComboIST().toISOString()
-      }
+        nextRoundStarts: nextRoundId.toISOString(),
+      },
     });
   } catch (error) {
     console.error('Error in getCards:', error);

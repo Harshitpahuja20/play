@@ -54,11 +54,16 @@ exports.getCards = async (req, res) => {
     const previousRoundId = getPreviousRoundComboUTC();
     const nextRoundId = getNextRoundComboUTC();
 
+
+    console.log(`1  ${nowUTC} ----  ${currentRoundId} ----  ${previousRoundId} ----  ${nextRoundId} ---- `)
+
     // Convert to IST (for user-facing display only)
     const nowIST = moment.utc(nowUTC).tz("Asia/Kolkata");
     const currentRoundIST = moment.utc(currentRoundId).tz("Asia/Kolkata");
     const previousRoundIST = moment.utc(previousRoundId).tz("Asia/Kolkata");
     const nextRoundIST = moment.utc(nextRoundId).tz("Asia/Kolkata");
+
+    console.log(`2  ${nowIST} ----  ${currentRoundIST} ----  ${previousRoundIST} ----  ${nextRoundIST} ---- `)
 
     // Fetch round and card data
     const [cards, currentRound, previousRoundAgg] = await Promise.all([

@@ -42,7 +42,7 @@ function logToFile(msg) {
 }
 
 // --- CRON: Close current round at :55 UTC ---
-cron.schedule("55 * * * *", async () => {
+cron.schedule("25 * * * *", async () => {
   const now = getUTCNow();
   const combo = getCurrentRoundComboUTC();
   const dateOnly = getUTCDateOnly(combo);
@@ -81,7 +81,7 @@ cron.schedule("55 * * * *", async () => {
 });
 
 // --- CRON: Create next round at :00 UTC ---
-cron.schedule("0 * * * *", async () => {
+cron.schedule("30 * * * *", async () => {
   const now = getUTCNow();
   const combo = getNextRoundComboUTC();
   const dateOnly = getUTCDateOnly(combo);
@@ -115,7 +115,7 @@ cron.schedule("0 * * * *", async () => {
 });
 
 // --- CRON: Process bets at :59 UTC ---
-cron.schedule("59 * * * *", async () => {
+cron.schedule("29 * * * *", async () => {
   const now = getUTCNow();
   const combo = getCurrentRoundComboUTC();
 

@@ -9,9 +9,9 @@ const crypto = require("crypto");
 const roundsModel = require("../model/rounds.model");
 const {
   getUTCNow,
-  getCurrentRoundComboUTC,
-  getPreviousRoundComboUTC,
-  getNextRoundComboUTC,
+  getCurrentRoundComboIST,
+  getNextRoundComboIST,
+  getPreviousRoundComboIST,
 } = require('../cron/roundcreator');
 
 
@@ -50,9 +50,9 @@ exports.getCards = async (req, res) => {
   try {
     // Get UTC-based timestamps
     const nowUTC = getUTCNow();
-    const currentRoundId = getCurrentRoundComboUTC();
-    const previousRoundId = getPreviousRoundComboUTC();
-    const nextRoundId = getNextRoundComboUTC();
+    const currentRoundId = getCurrentRoundComboIST();
+    const previousRoundId = getPreviousRoundComboIST();
+    const nextRoundId = getNextRoundComboIST();
 
 
     console.log(`1  ${nowUTC} ----  ${currentRoundId} ----  ${previousRoundId} ----  ${nextRoundId} ---- `)

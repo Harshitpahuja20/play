@@ -12,27 +12,27 @@ function getUTCNow() {
   return moment.utc().toDate();
 }
 
-// NEW: Align round to IST hour, then convert to UTC for storage
-function getCurrentRoundComboUTC() {
+// NEW: Align round to IST hour, then return IST for storage
+function getCurrentRoundComboIST() {
   const istNow = moment.tz(getUTCNow(), "Asia/Kolkata");
   const flooredIST = istNow.clone().startOf("hour");
-  return flooredIST.tz("UTC").toDate(); // returns UTC timestamp of that IST hour
+  return flooredIST.toDate(); // returns IST timestamp of that hour
 }
 
-function getNextRoundComboUTC() {
+function getNextRoundComboIST() {
   const istNow = moment.tz(getUTCNow(), "Asia/Kolkata");
   const nextIST = istNow.clone().startOf("hour").add(1, "hour");
-  return nextIST.tz("UTC").toDate();
+  return nextIST.toDate();
 }
 
-function getPreviousRoundComboUTC() {
+function getPreviousRoundComboIST() {
   const istNow = moment.tz(getUTCNow(), "Asia/Kolkata");
   const prevIST = istNow.clone().startOf("hour").subtract(1, "hour");
-  return prevIST.tz("UTC").toDate();
+  return prevIST.toDate();
 }
 
-function getUTCDateOnly(date = getUTCNow()) {
-  return moment.utc(date).startOf("day").toDate();
+function getISTDateOnly(date = getUTCNow()) {
+  return moment.tz(date, "Asia/Kolkata").startOf("day").toDate();
 }
 
 function logToFile(msg) {
@@ -41,11 +41,11 @@ function logToFile(msg) {
   // fs.appendFileSync("/var/log/myapp_cron.log", `[${timestamp}] ${msg}\n`);
 }
 
-// --- CRON: Close current round at :55 UTC ---
+// --- CRON: Close current round at :55 IST ---
 cron.schedule("25 * * * *", async () => {
   const now = getUTCNow();
-  const combo = getCurrentRoundComboUTC();
-  const dateOnly = getUTCDateOnly(combo);
+  const combo = getCurrentRoundComboIST();  // Change to IST
+  const dateOnly = getISTDateOnly(combo);  // Change to IST
 
   logToFile(`[CRON 55] Triggered at UTC: ${now.toISOString()}`);
 
@@ -80,11 +80,11 @@ cron.schedule("25 * * * *", async () => {
   }
 });
 
-// --- CRON: Create next round at :00 UTC ---
+// --- CRON: Create next round at :00 IST ---
 cron.schedule("30 * * * *", async () => {
   const now = getUTCNow();
-  const combo = getNextRoundComboUTC();
-  const dateOnly = getUTCDateOnly(combo);
+  const combo = getNextRoundComboIST();  // Change to IST
+  const dateOnly = getISTDateOnly(combo);  // Change to IST
 
   logToFile(`[CRON 00] Triggered at UTC: ${now.toISOString()}`);
 
@@ -114,10 +114,10 @@ cron.schedule("30 * * * *", async () => {
   }
 });
 
-// --- CRON: Process bets at :59 UTC ---
+// --- CRON: Process bets at :59 IST ---
 cron.schedule("29 * * * *", async () => {
   const now = getUTCNow();
-  const combo = getCurrentRoundComboUTC();
+  const combo = getCurrentRoundComboIST();  // Change to IST
 
   logToFile(`[CRON 59] Triggered at UTC: ${now.toISOString()}`);
 
@@ -220,7 +220,7 @@ cron.schedule("*/15 * * * *", async () => {
       logToFile(`[HEALTH CHECK] No active round.`);
     }
 
-    const currentCombo = getCurrentRoundComboUTC();
+    const currentCombo = getCurrentRoundComboIST();
     const shouldBeClosed = await roundsModel.findOne({ combo: { $lt: currentCombo }, isClosed: false });
 
     if (shouldBeClosed) {
@@ -231,11 +231,11 @@ cron.schedule("*/15 * * * *", async () => {
   }
 });
 
-// Export UTC-based helper functions
+// Export IST-based helper functions
 module.exports = {
   getUTCNow,
-  getCurrentRoundComboUTC,
-  getNextRoundComboUTC,
-  getPreviousRoundComboUTC,
-  getUTCDateOnly,
+  getCurrentRoundComboIST,
+  getNextRoundComboIST,
+  getPreviousRoundComboIST,
+  getISTDateOnly,
 };

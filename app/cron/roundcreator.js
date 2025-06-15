@@ -44,8 +44,8 @@ function logToFile(msg) {
 // --- CRON: Close current round at :55 IST ---
 cron.schedule("25 * * * *", async () => {
   const now = getUTCNow();
-  const combo = getCurrentRoundComboIST();  // Change to IST
-  const dateOnly = getISTDateOnly(combo);  // Change to IST
+  const combo = getCurrentRoundComboIST(); // Change to IST
+  const dateOnly = getISTDateOnly(combo); // Change to IST
 
   logToFile(`[CRON 55] Triggered at UTC: ${now.toISOString()}`);
 
@@ -53,7 +53,10 @@ cron.schedule("25 * * * *", async () => {
     let round = await roundsModel.findOne({ combo });
 
     if (!round) {
-      const lastRound = await roundsModel.findOne().sort({ createdAt: -1 }).lean();
+      const lastRound = await roundsModel
+        .findOne()
+        .sort({ createdAt: -1 })
+        .lean();
       const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
       await roundsModel.create({
@@ -66,7 +69,9 @@ cron.schedule("25 * * * *", async () => {
         updatedAt: now,
       });
 
-      logToFile(`[CRON 55] Round missing — created & closed (roundId: ${nextRoundId})`);
+      logToFile(
+        `[CRON 55] Round missing — created & closed (roundId: ${nextRoundId})`
+      );
     } else if (!round.isClosed) {
       round.isClosed = true;
       round.updatedAt = now;
@@ -83,8 +88,8 @@ cron.schedule("25 * * * *", async () => {
 // --- CRON: Create next round at :00 IST ---
 cron.schedule("30 * * * *", async () => {
   const now = getUTCNow();
-  const combo = getNextRoundComboIST();  // Change to IST
-  const dateOnly = getISTDateOnly(combo);  // Change to IST
+  const combo = getNextRoundComboIST(); // Change to IST
+  const dateOnly = getISTDateOnly(combo); // Change to IST
 
   logToFile(`[CRON 00] Triggered at UTC: ${now.toISOString()}`);
 
@@ -95,7 +100,10 @@ cron.schedule("30 * * * *", async () => {
       return;
     }
 
-    const lastRound = await roundsModel.findOne().sort({ createdAt: -1 }).lean();
+    const lastRound = await roundsModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .lean();
     const nextRoundId = lastRound?.roundId ? lastRound.roundId + 1 : 1;
 
     await roundsModel.create({
@@ -117,7 +125,7 @@ cron.schedule("30 * * * *", async () => {
 // --- CRON: Process bets at :59 IST ---
 cron.schedule("29 * * * *", async () => {
   const now = getUTCNow();
-  const combo = getCurrentRoundComboIST();  // Change to IST
+  const combo = getCurrentRoundComboIST(); // Change to IST
 
   logToFile(`[CRON 59] Triggered at UTC: ${now.toISOString()}`);
 
@@ -129,19 +137,32 @@ cron.schedule("29 * * * *", async () => {
     }
 
     if (!round.cardId) {
-      const cardBets = await betModel.aggregate([
+      const allCards = await cardModel.find({}, { _id: 1 }); // Get all 12 cards
+      const allCardIds = allCards.map((card) => card._id);
+
+      // Get bet totals for each card in this round
+      const bets = await betModel.aggregate([
         { $match: { roundId: round._id } },
         { $group: { _id: "$cardId", totalBets: { $sum: "$betAmount" } } },
-        { $sort: { totalBets: 1 } },
-        { $limit: 1 },
       ]);
 
-      if (cardBets.length > 0) {
-        round.cardId = cardBets[0]._id;
+      const betMap = new Map(bets.map((b) => [b._id.toString(), b.totalBets]));
+
+      // Find cards with zero bets
+      const cardsWithNoBets = allCardIds.filter(
+        (cardId) => !betMap.has(cardId.toString())
+      );
+
+      if (cardsWithNoBets.length > 0) {
+        // Pick one randomly among cards with no bets
+        const randomIndex = Math.floor(Math.random() * cardsWithNoBets.length);
+        round.cardId = cardsWithNoBets[randomIndex];
       } else {
-        const [randomCard] = await cardModel.aggregate([{ $sample: { size: 1 } }]);
-        if (!randomCard) throw new Error("No card available.");
-        round.cardId = randomCard._id;
+        // All cards have bets — pick the one with the least total bets
+        const cardWithLeastBet = bets.sort(
+          (a, b) => a.totalBets - b.totalBets
+        )[0];
+        round.cardId = cardWithLeastBet._id;
       }
 
       round.resultDeclaredAt = now;
@@ -156,7 +177,7 @@ cron.schedule("29 * * * *", async () => {
 
     for (const bet of bets) {
       const isWin = bet.cardId.toString() === round.cardId.toString();
-      const resultAmount = isWin ? bet.betAmount * 11 : bet.betAmount;
+      const resultAmount = isWin ? bet.betAmount * 10 : bet.betAmount;
       const userCredit = isWin ? resultAmount : 0;
 
       bulkBetOps.push({
@@ -213,18 +234,29 @@ cron.schedule("*/15 * * * *", async () => {
     const now = getUTCNow();
     logToFile(`[HEALTH CHECK] Running - UTC: ${now.toISOString()}`);
 
-    const activeRound = await roundsModel.findOne({ isClosed: false }).sort({ createdAt: -1 });
+    const activeRound = await roundsModel
+      .findOne({ isClosed: false })
+      .sort({ createdAt: -1 });
     if (activeRound) {
-      logToFile(`[HEALTH CHECK] Active round: ${activeRound.roundId}, Combo: ${activeRound.combo.toISOString()}`);
+      logToFile(
+        `[HEALTH CHECK] Active round: ${
+          activeRound.roundId
+        }, Combo: ${activeRound.combo.toISOString()}`
+      );
     } else {
       logToFile(`[HEALTH CHECK] No active round.`);
     }
 
     const currentCombo = getCurrentRoundComboIST();
-    const shouldBeClosed = await roundsModel.findOne({ combo: { $lt: currentCombo }, isClosed: false });
+    const shouldBeClosed = await roundsModel.findOne({
+      combo: { $lt: currentCombo },
+      isClosed: false,
+    });
 
     if (shouldBeClosed) {
-      logToFile(`[HEALTH CHECK] WARNING: Unclosed round found: ${shouldBeClosed.roundId}`);
+      logToFile(
+        `[HEALTH CHECK] WARNING: Unclosed round found: ${shouldBeClosed.roundId}`
+      );
     }
   } catch (err) {
     logToFile(`[HEALTH CHECK] Error: ${err.message}`);

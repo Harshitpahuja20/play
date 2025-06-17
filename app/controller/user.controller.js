@@ -271,8 +271,3 @@ async function sendOtp(phoneNumber, otp, templateName) {
 
 
 }
-
-setTimeout(() => {
-  console.log('start')
-  sendOtp("9812158121" , 123456 , "1")
-}, 4000);

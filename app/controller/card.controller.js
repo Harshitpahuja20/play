@@ -80,6 +80,12 @@ exports.getCards = async (req, res) => {
           },
         },
         { $unwind: { path: "$card", preserveNullAndEmptyArrays: true } },
+        {
+          $project : {
+             _id: 1,
+    image: "$card.image"
+          }
+        }
       ]),
     ]);
 

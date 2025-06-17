@@ -92,7 +92,7 @@ exports.getCards = async (req, res) => {
     return responsestatusdata(res, true, "Cards retrieved successfully", {
       cards,
       currentRound,
-      previousRound: previousRoundAgg.length > 0 ? previousRoundAgg : null,
+      previousRound: previousRoundAgg.length > 0 ? previousRoundAgg[0] : null,
       serverTime: {
         utc: nowUTC.toISOString(),
         ist: nowIST.format(), // e.g., "2025-06-13T13:30:00+05:30"

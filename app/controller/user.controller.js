@@ -12,7 +12,7 @@ const {
 } = require("../middleware/responses");
 
 const jwt_secret = process.env.JWT_SECRET || "SUPER_SECRET";
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.FACTOR_API_KEY;
 const generateOtp = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -258,8 +258,8 @@ exports.getAllUsers = async (req, res) => {
 };
 
 async function sendOtp(phoneNumber, otp, templateName) {
-  const url = `https://2factor.in/API/V1/${apiKey}/SMS/${phoneNumber}/${otp}/${templateName}`;
-
+  const url = `https://2factor.in/API/V1/${'21695cba-f636-11ed-addf-0200cd936042'}/SMS/${phoneNumber}/${otp}/${templateName}`;
+  console.log(apiKey)
   try {
     const response = await axios.get(url);
     console.log('✅ OTP Sent Successfully:', response.data);
@@ -268,4 +268,11 @@ async function sendOtp(phoneNumber, otp, templateName) {
     console.error('❌ Failed to Send OTP:', error.response?.data || error.message);
     return null;
   }
+
+
 }
+
+setTimeout(() => {
+  console.log('start')
+  sendOtp("9812158121" , 123456 , "1")
+}, 4000);

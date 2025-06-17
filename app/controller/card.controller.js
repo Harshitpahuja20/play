@@ -70,7 +70,7 @@ exports.getCards = async (req, res) => {
       Card.find().sort({ createdAt: 1 }),
       roundsModel.findOne({ combo: currentRoundId }),
       roundsModel.aggregate([
-        { $match: { combo: previousRoundId } },
+        { $match: { combo: new Date(previousRoundId) } },
         {
           $lookup: {
             from: "cards",
@@ -82,6 +82,8 @@ exports.getCards = async (req, res) => {
         { $unwind: { path: "$card", preserveNullAndEmptyArrays: true } },
       ]),
     ]);
+
+    console.log(currentRound, previousRoundAgg)
 
     if (!cards || cards.length === 0) {
       return responsestatusmessage(res, false, "No cards found.");

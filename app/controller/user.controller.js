@@ -2,6 +2,7 @@
 
 const User = require("../model/user.model");
 const bcrypt = require("bcryptjs");
+const axios = require("axios");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const {

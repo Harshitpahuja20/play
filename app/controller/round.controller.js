@@ -70,9 +70,12 @@ exports.getAllRounds = async (req, res) => {
     const { date } = req.query;
 
     const selectedDate = date ? new Date(date) : new Date();
+    selectedDate.setDate(selectedDate.getDate() - 1);
 
     const startOfDay = new Date(selectedDate.setUTCHours(0, 0, 0, 0));
-    const endOfDay = new Date(new Date(startOfDay).setUTCHours(23, 59, 59, 999));
+    const endOfDay = new Date(
+      new Date(startOfDay).setUTCHours(23, 59, 59, 999)
+    );
 
     const rounds = await roundsModel.aggregate([
       {
@@ -127,7 +130,13 @@ exports.getAllRounds = async (req, res) => {
           let: { roundId: "$_id" },
           pipeline: [
             { $match: { $expr: { $eq: ["$roundId", "$$roundId"] } } },
-            { $group: { _id: null, totalCount: { $sum: 1 }, totalAmount: { $sum: "$betAmount" } } },
+            {
+              $group: {
+                _id: null,
+                totalCount: { $sum: 1 },
+                totalAmount: { $sum: "$betAmount" },
+              },
+            },
           ],
           as: "totalBetsInfo",
         },
@@ -179,10 +188,55 @@ exports.getAllRounds = async (req, res) => {
 
     return responsestatusdata(res, true, "Rounds fetched successfully", rounds);
   } catch (err) {
-    return responsestatusmessage(res, false, err?.message || "Failed to fetch rounds");
+    return responsestatusmessage(
+      res,
+      false,
+      err?.message || "Failed to fetch rounds"
+    );
   }
 };
 
+exports.getAllResults = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    const selectedDate = date ? new Date(date) : new Date();
+    selectedDate.setDate(selectedDate.getDate() - 1);
+
+    const startOfDay = new Date(selectedDate.setUTCHours(0, 0, 0, 0));
+    const endOfDay = new Date(
+      new Date(startOfDay).setUTCHours(23, 59, 59, 999)
+    );
+
+    const rounds = await roundsModel.aggregate([
+      {
+        $match: {
+          date: { $gte: startOfDay, $lte: endOfDay },
+        },
+      },
+      // Lookup winning card info
+      {
+        $lookup: {
+          from: "cards",
+          localField: "cardId",
+          foreignField: "_id",
+          as: "card",
+        },
+      },
+      { $unwind: { path: "$card", preserveNullAndEmptyArrays: true } },
+
+      { $sort: { time: -1 } },
+    ]);
+
+    return responsestatusdata(res, true, "Rounds fetched successfully", rounds);
+  } catch (err) {
+    return responsestatusmessage(
+      res,
+      false,
+      err?.message || "Failed to fetch rounds"
+    );
+  }
+};
 
 exports.updateResult = async (req, res) => {
   const { roundId, cardId } = req.body;

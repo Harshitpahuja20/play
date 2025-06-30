@@ -22,6 +22,7 @@ const {
 const {
   getAllRounds,
   updateResult,
+  getAllResults,
 } = require("../controller/round.controller");
 const { addBalance, getUserTransactions, getWithdrawRequests, WithdrawRequest } = require("../controller/transaction.controller");
 const { getStatistics } = require("../controller/dashbaord.controller");
@@ -50,6 +51,7 @@ router.get("/bets", getAllBets);
 
 // round routes
 router.get("/getAllRounds",authAdmin, getAllRounds);
+router.get("/getAllResults", getAllResults);
 router.put("/updateResult",authAdmin, updateResult);
 
 // balance routes

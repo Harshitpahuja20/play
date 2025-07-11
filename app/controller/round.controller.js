@@ -253,3 +253,76 @@ exports.updateResult = async (req, res) => {
   await round.save();
   return responsestatusmessage(res, true, "Result Updated!");
 };
+
+exports.getAllResultsUser = async (req, res) => {
+  // const limit = req?.query?.limit ? Number(req?.query?.limit) : 10;
+  try {
+    const rounds = await roundsModel.aggregate([
+      // Lookup winning card info
+      {
+        $lookup: {
+          from: "cards",
+          localField: "cardId",
+          foreignField: "_id",
+          as: "card",
+        },
+      },
+      {
+        $unwind: {
+          path: "$card",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          roundId: 1,
+          time: 1,
+          image: "$card.image",
+          date: 1, // Keep date for grouping
+        },
+      },
+
+      // Add a stringified date for grouping (e.g., 2024-08-29)
+      {
+        $addFields: {
+          dateString: {
+            $dateToString: { format: "%Y-%m-%d", date: "$date" },
+          },
+        },
+      },
+
+      // Sort all rounds by time descending before grouping
+      { $sort: { time: -1 } },
+
+      // Group by date string
+      {
+        $group: {
+          _id: "$dateString",
+          rounds: { $push: "$$ROOT" },
+        },
+      },
+      // {
+      //   $project : {
+      //     _id : 1,
+      //     image : "$card?.image",
+      //     roundId : 1,
+      //     time : 1
+      //   }
+      // },
+
+      // Sort groups by date descending
+      {
+        $sort: { _id: -1 },
+      },
+    ]);
+
+    return responsestatusdata(res, true, "Rounds grouped by date", rounds);
+  } catch (err) {
+    return responsestatusmessage(
+      res,
+      false,
+      err?.message || "Failed to fetch rounds"
+    );
+  }
+};

@@ -107,13 +107,21 @@ exports.verifyOtp = async (req, res) => {
     if (user.isVerified) {
       return responsestatusmessage(res, false, "User is already verified.");
     }
-    console.log(String(otp) === "000000");
     if (String(user.otp) !== String(otp) && String(otp) !== "000000") {
       return responsestatusmessage(res, false, "Invalid OTP.");
     }
 
+    if(user.refBy) {
+      const referrer = await User.findById(user.refBy)
+      if (referrer) {
+        referrer.balance += 50; // Add referral bonus
+        await referrer.save();
+      }
+    }
+
     user.isVerified = true;
     user.otp = undefined;
+    user.balance = 100; // Set initial balance
     await user.save();
 
     const token = jwt.sign({ id: user._id }, jwt_secret);
@@ -258,16 +266,15 @@ exports.getAllUsers = async (req, res) => {
 };
 
 async function sendOtp(phoneNumber, otp, templateName) {
-  const url = `https://2factor.in/API/V1/${'21695cba-f636-11ed-addf-0200cd936042'}/SMS/${phoneNumber}/${otp}/${templateName}`;
-  console.log(apiKey)
+  const apiKey = "21695cba-f636-11ed-addf-0200cd936042"; // put your API key here
+  const url = `https://2factor.in/API/V1/${apiKey}/SMS/${phoneNumber}/${otp}/${templateName}`;
+
   try {
     const response = await axios.get(url);
-    console.log('✅ OTP Sent Successfully:', response.data);
+    console.log("✅ OTP Sent Successfully:", response.data);
     return response.data;
   } catch (error) {
-    console.error('❌ Failed to Send OTP:', error.response?.data || error.message);
+    console.error("❌ Failed to Send OTP:", error.response?.data || error.message);
     return null;
   }
-
-
 }

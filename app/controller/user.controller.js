@@ -76,7 +76,7 @@ exports.sendOtp = async (req, res) => {
     }
 
     console.log(`OTP for ${phoneNumber}: ${otp}`);
-    await sendOtp(phoneNumber , otp , 1)
+    await sendOtp(phoneNumber, otp, 1);
     return responsestatusdata(res, true, "OTP sent successfully.", {
       otp,
     }); // remove otp in prod
@@ -111,8 +111,8 @@ exports.verifyOtp = async (req, res) => {
       return responsestatusmessage(res, false, "Invalid OTP.");
     }
 
-    if(user.refBy) {
-      const referrer = await User.findById(user.refBy)
+    if (user.refBy) {
+      const referrer = await User.findById(user.refBy);
       if (referrer) {
         referrer.balance += 50; // Add referral bonus
         await referrer.save();
@@ -201,15 +201,15 @@ exports.adminlogin = async (req, res) => {
       return responsestatusmessage(
         res,
         false,
-        "fullName and password are required."
+        "Phone Number and password are required."
       );
     }
 
-    const user = await User.findOne({ fullName });
+    const user = await User.findOne({ phoneNumber: fullName });
     console.log(user);
     console.log(jwt_secret);
 
-    if (!user || user.role !== "admin") {
+    if (!user || !["admin", "subadmin"].includes(user.role)) {
       return responsestatusmessage(res, false, "User not found.");
     }
 
@@ -258,7 +258,7 @@ exports.getCurrentUser = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({isVerified : true , role : {$ne : "admin"}});
+    const users = await User.find({ isVerified: true, role: { $ne: "admin" } });
     return responsestatusdata(res, true, "Fetched Successfully", users);
   } catch (error) {
     return responsestatusmessage(res, false, err?.message);
@@ -274,7 +274,84 @@ async function sendOtp(phoneNumber, otp, templateName) {
     console.log("✅ OTP Sent Successfully:", response.data);
     return response.data;
   } catch (error) {
-    console.error("❌ Failed to Send OTP:", error.response?.data || error.message);
+    console.error(
+      "❌ Failed to Send OTP:",
+      error.response?.data || error.message
+    );
     return null;
   }
 }
+
+exports.addSubAdmin = async (req, res) => {
+  try {
+    const { fullName, phoneNumber, password } = req.body;
+
+    // Basic validations
+    if (!fullName || !phoneNumber || !password) {
+      return responsestatusmessage(res, false, "All fields are required");
+    }
+
+    // Check if phone already exists
+    const existingUser = await User.findOne({ phoneNumber, role: "subadmin" });
+    if (existingUser) {
+      return responsestatusmessage(
+        res,
+        false,
+        "Subadmin with this phone number already exists"
+      );
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const data = {
+      fullName,
+      phoneNumber,
+      password: hashedPassword, // ⚠️ Make sure to hash before save (bcrypt)
+      isVerified: true,
+      role: "subadmin",
+    };
+
+    const user = new User(data);
+    await user.save();
+    return responsestatusmessage(res, true, "Subadmin created successfully");
+  } catch (error) {
+    console.error(error);
+    return responsestatusmessage(res, false, "Error creating subadmin");
+  }
+};
+
+// ✅ Get All Sub Admins (No Pagination)
+exports.getAllSubAdmins = async (req, res) => {
+  try {
+    const subadmins = await User.find({ role: "subadmin" }).select("-password");
+    // 👆 excludes password for security
+
+    return responsestatusdata(res, true, "Fetched Successfully", subadmins);
+  } catch (error) {
+    console.error(error);
+    return responsestatusmessage(res, false, "Error fetching subadmins");
+  }
+};
+
+exports.getAllUsersForSubAdmin = async (req, res) => {
+  const { q } = req.query;
+
+  try {
+    let filter = { role: "user" };
+
+    // If query is passed, match with phoneNumber using regex
+    if (q && q.trim().length >= 3) {
+      filter.phoneNumber = { $regex: q, $options: "i" };
+    }
+
+    const subadmins = await User.find(filter).select(
+      "_id fullName phoneNumber"
+    );
+
+    return responsestatusdata(res, true, "Fetched Successfully", subadmins);
+  } catch (error) {
+    console.error(error);
+    return responsestatusmessage(res, false, "Error fetching subadmins");
+  }
+};

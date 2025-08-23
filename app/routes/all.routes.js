@@ -7,13 +7,16 @@ const {
   getCurrentRole,
   getAllUsers,
   getCurrentUser,
+  addSubAdmin,
+  getAllSubAdmins,
+  getAllUsersForSubAdmin,
 } = require("../controller/user.controller");
 const {
   addCard,
   getCards,
   getAdminCards,
 } = require("../controller/card.controller");
-const { authAdmin, authUser } = require("../middleware/auth.middleWare");
+const { authAdmin, authUser, authAdminSubAdmin, authSubAdmin } = require("../middleware/auth.middleWare");
 const {
   placeBet,
   getUserBets,
@@ -25,7 +28,7 @@ const {
   getAllResults,
   getAllResultsUser,
 } = require("../controller/round.controller");
-const { addBalance, getUserTransactions, getWithdrawRequests, WithdrawRequest } = require("../controller/transaction.controller");
+const { addBalance, getUserTransactions, getWithdrawRequests, WithdrawRequest, getSubAdminUsers, withdraw } = require("../controller/transaction.controller");
 const { getStatistics } = require("../controller/dashbaord.controller");
 const { getContent } = require("../controller/Content.controller");
 
@@ -36,7 +39,12 @@ router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/login", login);
 router.post("/adminlogin", adminlogin);
-router.get("/getCurrentRole",authAdmin, getCurrentRole);
+router.post("/admin/user/create",authAdmin , addSubAdmin);
+router.get("/admin/getAllSubadmin",authAdmin , getAllSubAdmins);
+router.get("/subadmin/users",authSubAdmin , getAllUsersForSubAdmin);
+router.get("/subadmin/getSubAdminUsers",authSubAdmin , getSubAdminUsers);
+router.get("/getCurrentRole",authAdminSubAdmin, getCurrentRole);
+router.post("/withdraw",authAdminSubAdmin, withdraw);
 router.get("/getCurrentUser",authUser, getCurrentUser);
 router.get("/getAllUsers", authAdmin , getAllUsers);
 
@@ -57,7 +65,7 @@ router.get("/getAllResultsUser", getAllResultsUser);
 router.put("/updateResult",authAdmin, updateResult);
 
 // balance routes
-router.post("/addBalance",authAdmin, addBalance);
+router.post("/addBalance",authAdminSubAdmin, addBalance);
 router.get("/getWithdrawRequests",authAdmin, getWithdrawRequests);
 router.get("/getUserTransactions",authUser, getUserTransactions);
 router.post("/requestWithdraw",authUser, WithdrawRequest);
